@@ -116,6 +116,18 @@ defmodule Ecto.Repo.Hooks do
         |> super(opts)
         |> Enum.map(&@hooks.after_get/1)
       end
+
+      def delete(query, opts) do
+        with {:ok, result} <- super(query, opts) do
+          {:ok, @hooks.after_delete(result)}
+        end
+      end
+
+      def delete!(query, opts) do
+        query
+        |> super(opts)
+        |> @hooks.after_delete
+      end
     end
   end
 
@@ -152,6 +164,18 @@ defmodule Ecto.Repo.Hooks do
   end
 
   def after_get(data) do
+    data
+  end
+
+  def after_delete(%schema{} = data) do
+    if function_exported?(schema, :after_delete, 1) do
+      schema.after_delete(data)
+    else
+      data
+    end
+  end
+
+  def after_delete(data) do
     data
   end
 end
