@@ -1,4 +1,4 @@
-defmodule Ecto.Repo.Hooks do
+defmodule EctoHooks do
   @moduledoc """
   When `use`-ed in a module that also `use`-es `Ecto.Repo`, augments the following
   `Ecto.Repo` callbacks to provide user definable hooks following successful
@@ -35,6 +35,12 @@ defmodule Ecto.Repo.Hooks do
   Any results wrapped within an `{:ok, _}` or `{:error, _}` are also returned re-wrapped
   as expected.
 
+  The hooking functionality provided by `EctoHooks` can be pretty useful for resolving
+  virtual fields, but can also prove useful for centralising some logging or telemetry
+  logic. Note that because any business logic is executed synchronously after the
+  hooked `Ecto.Repo` callback, one should avoid doing any blocking or potentially
+  terminating logic within hooks as weird or strange behaviour may occur.
+
   ## Example usage:
   ```elixir
   def MyApp.Repo do
@@ -42,7 +48,7 @@ defmodule Ecto.Repo.Hooks do
       otp_app: :my_app,
       adapter: Ecto.Adapters.Postgres
 
-    use Ecto.Repo.Hooks
+    use EctoHooks
   end
 
   def MyApp.User do

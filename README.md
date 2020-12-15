@@ -36,8 +36,22 @@ def MyApp.User do
 end
 ```
 
-As one can see, this is pretty useful for resolving virtual fields, but can also
-prove useful for centralising some logging or telemetry logic.
+Alternatively, one can opt to use a more transparent API for initializing
+`EctoHooks`:
+
+```elixir
+def MyApp.Repo do
+  use EctoHooks.Repo,
+    otp_app: :my_app,
+    adapter: Ecto.Adapters.Postgres
+end
+```
+
+The hooking functionality provided by `EctoHooks` can be pretty useful for resolving
+virtual fields, but can also prove useful for centralising some logging or telemetry
+logic. Note that because any business logic is executed synchronously after the
+hooked `Ecto.Repo` callback, one should avoid doing any blocking or potentially
+terminating logic within hooks as weird or strange behaviour may occur.
 
 At the time of writing, this library does not intend on implementing any hooks
 for executing logic _before_ a database operation. The only hooks implemented
