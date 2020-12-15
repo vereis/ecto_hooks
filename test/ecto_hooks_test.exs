@@ -188,5 +188,31 @@ defmodule Ecto.Repo.HooksTest do
     test "does not executes after unsuccessful Repo.get!/2" do
       assert_raise Ecto.NoResultsError, fn -> assert user = Repo.get!(User, 1) end
     end
+
+    test "executes after successful Repo.get_by/2", %{user: user} do
+      assert capture_log(fn ->
+               assert user = Repo.get_by(User, first_name: user.first_name)
+               assert user.full_name == "Bob Dylan"
+             end) =~ "after get"
+    end
+
+    test "executes after successful Repo.get_by!/2", %{user: user} do
+      assert capture_log(fn ->
+               assert user = Repo.get_by!(User, first_name: user.first_name)
+               assert user.full_name == "Bob Dylan"
+             end) =~ "after get"
+    end
+
+    test "does not executes after unsuccessful Repo.get_by/2" do
+      refute capture_log(fn ->
+               assert is_nil(Repo.get_by(User, first_name: "Amy"))
+             end) =~ "after get"
+    end
+
+    test "does not executes after unsuccessful Repo.get_by!/2" do
+      assert_raise Ecto.NoResultsError, fn ->
+        assert user = Repo.get_by!(User, first_name: "Amy")
+      end
+    end
   end
 end
