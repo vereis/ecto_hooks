@@ -4,7 +4,7 @@ defmodule Ecto.Repo.Hooks do
   `Ecto.Repo` callbacks to provide user definable hooks following successful
   execution.
 
-  # Hooks to `MyApp.EctoSchema.after_get/1`
+  Hooks to `MyApp.EctoSchema.after_get/1`:
   - `all/2`
   - `get/3`
   - `get!/3`
@@ -13,22 +13,53 @@ defmodule Ecto.Repo.Hooks do
   - `one/2`
   - `one!/2`
 
-  # Hooks to `MyApp.EctoSchema.after_delete/1`
+  Hooks to `MyApp.EctoSchema.after_delete/1`:
   - `delete/2`
   - `delete!/2`
 
-  # Hooks to `MyApp.EctoSchema.after_insert/1`
+  Hooks to `MyApp.EctoSchema.after_insert/1`:
   - `insert/2`
   - `insert!/2`
 
-  # Hooks to `MyApp.EctoSchema.after_update/1`
+  Hooks to `MyApp.EctoSchema.after_update/1`:
   - `update/2`
   - `update!/2`
 
-  # Hooks to `MyApp.EctoSchema.after_insert/1` or to
-  # `MyApp.Ecto.Schema.after_update/1`
+  Hooks to `MyApp.EctoSchema.after_insert/1` or to `MyApp.Ecto.Schema.after_update/1`:
   - `insert_or_update/2`
   - `insert_or_update!/2`
+
+  Please note that the result of executing a hook is the result ultimately returned
+  a user, and thus you should aim to only modify a given database result.
+
+  Any results wrapped within an `{:ok, _}` or `{:error, _}` are also returned re-wrapped
+  as expected.
+
+  ## Example usage:
+  ```elixir
+  def MyApp.Repo do
+    use Ecto.Repo,
+      otp_app: :my_app,
+      adapter: Ecto.Adapters.Postgres
+
+    use Ecto.Repo.Hooks
+  end
+
+  def MyApp.User do
+    use Ecto.Changeset
+
+    schema "users" do
+      field :first_name, :string
+      field :last_name, :string
+
+      field :full_name, :string, virtual: true
+    end
+
+    def after_get(%__MODULE__{first_name: first_name, last_name: last_name} = user) do
+      %__MODULE__{user | full_name: first_name <> " " <> last_name}
+    end
+  end
+  ```
   """
 
   defmacro __using__(_opts) do

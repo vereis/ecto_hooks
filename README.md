@@ -13,10 +13,11 @@ module: `Ecto.Repo.Hooks`. Upon invokation, any successful database
 
 ```elixir
 def MyApp.Repo do
-  use Ecto.Repo.Hooks
   use Ecto.Repo,
     otp_app: :my_app,
     adapter: Ecto.Adapters.Postgres
+
+  use Ecto.Repo.Hooks
 end
 
 def MyApp.User do
