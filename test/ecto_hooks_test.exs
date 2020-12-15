@@ -44,6 +44,7 @@ defmodule Ecto.Repo.HooksTest do
 
   use ExUnit.Case
   import ExUnit.CaptureLog
+  import Ecto.Query
 
   setup do
     {:ok, _} = start_supervised(%{id: __MODULE__, start: {Repo, :start_link, []}})
@@ -212,6 +213,38 @@ defmodule Ecto.Repo.HooksTest do
     test "does not executes after unsuccessful Repo.get_by!/2" do
       assert_raise Ecto.NoResultsError, fn ->
         assert user = Repo.get_by!(User, first_name: "Amy")
+      end
+    end
+
+    test "executes after successful Repo.one/2", %{user: user} do
+      assert capture_log(fn ->
+               user_id = user.id
+               query = from(u in User, where: u.id == ^user_id)
+               assert user = Repo.one(query)
+               assert user.full_name == "Bob Dylan"
+             end) =~ "after get"
+    end
+
+    test "executes after successful Repo.one!/2", %{user: user} do
+      assert capture_log(fn ->
+               user_id = user.id
+               query = from(u in User, where: u.id == ^user_id)
+               assert user = Repo.one!(query)
+               assert user.full_name == "Bob Dylan"
+             end) =~ "after get"
+    end
+
+    test "does not executes after unsuccessful Repo.one/2" do
+      refute capture_log(fn ->
+               query = from(u in User, where: u.id == 999)
+               assert is_nil(Repo.one(query))
+             end) =~ "after get"
+    end
+
+    test "does not executes after unsuccessful Repo.one!/2" do
+      assert_raise Ecto.NoResultsError, fn ->
+        query = from(u in User, where: u.id == 999)
+        assert is_nil(Repo.one!(query))
       end
     end
   end
