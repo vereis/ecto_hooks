@@ -43,6 +43,11 @@ At the time of writing, this library does not intend on implementing any hooks
 for executing logic _before_ a database operation. The only hooks implemented
 are those that are executed following an appropriate `Ecto.Repo` callback.
 
+## Links
+
+- [hex.pm package link](https://hex.pm/packages/ecto_hooks)
+- [online documentation](https://hexdocs.pm/ecto_hooks/Ecto.Repo.Hooks.html)
+
 ## Installation
 
 You can install this dependency by adding the following to your application's
