@@ -26,8 +26,14 @@ defmodule EctoHooks.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      # Lint dependencies
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
+
+      # Test dependencies
+      {:etso, "~> 0.1.2", only: :test},
+
+      # Misc dependencies
       {:ex_doc, "~> 0.14", only: :dev, runtime: false}
     ]
   end
