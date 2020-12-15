@@ -247,5 +247,21 @@ defmodule Ecto.Repo.HooksTest do
         assert is_nil(Repo.one!(query))
       end
     end
+
+    test "executes after successful Repo.all/2", %{user: user} do
+      assert capture_log(fn ->
+               user_id = user.id
+               query = from(u in User, where: u.id == ^user_id)
+               assert [user] = Repo.all(query)
+               assert user.full_name == "Bob Dylan"
+             end) =~ "after get"
+    end
+
+    test "does not executes after unsuccessful Repo.all/2" do
+      refute capture_log(fn ->
+               query = from(u in User, where: u.id == 999)
+               assert [] = Repo.all(query)
+             end) =~ "after get"
+    end
   end
 end

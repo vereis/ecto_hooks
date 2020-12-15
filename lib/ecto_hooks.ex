@@ -110,6 +110,12 @@ defmodule Ecto.Repo.Hooks do
         |> super(opts)
         |> @hooks.after_get
       end
+
+      def all(query, opts) do
+        query
+        |> super(opts)
+        |> Enum.map(&@hooks.after_get/1)
+      end
     end
   end
 
