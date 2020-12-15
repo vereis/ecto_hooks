@@ -35,6 +35,11 @@ defmodule Ecto.Repo.HooksTest do
       %__MODULE__{data | full_name: first_name <> " " <> last_name}
     end
 
+    def after_delete(%__MODULE__{first_name: first_name, last_name: last_name} = data) do
+      Logger.info("after delete")
+      %__MODULE__{data | full_name: first_name <> " " <> last_name}
+    end
+
     def changeset(%__MODULE__{} = user, attrs) do
       user
       |> cast(attrs, [:first_name, :last_name])
@@ -262,6 +267,41 @@ defmodule Ecto.Repo.HooksTest do
                query = from(u in User, where: u.id == 999)
                assert [] = Repo.all(query)
              end) =~ "after get"
+    end
+  end
+
+  describe "after_delete/1" do
+    setup do
+      Logger.configure(level: :error)
+
+      {:ok, user} =
+        %User{}
+        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+        |> Repo.insert()
+
+      Logger.configure(level: :info)
+
+      {:ok, user: user}
+    end
+
+    test "executes after successful Repo.delete/2", %{user: user} do
+      assert capture_log(fn ->
+               assert {:ok, deleted_user} = Repo.delete(user)
+               assert deleted_user.full_name == "Bob Dylan"
+             end) =~ "after delete"
+    end
+
+    test "executes after successful Repo.delete!/2", %{user: user} do
+      assert capture_log(fn ->
+               assert deleted_user = Repo.delete!(user)
+               assert deleted_user.full_name == "Bob Dylan"
+             end) =~ "after delete"
+    end
+
+    test "does not executes after unsuccessful Repo.delete!/2" do
+      assert_raise Ecto.NoPrimaryKeyValueError, fn ->
+        assert Repo.delete!(%User{})
+      end
     end
   end
 end
