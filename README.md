@@ -7,7 +7,7 @@ be implemented to run before or after certain database operations using the
 (rather than the modern variant: `Ecto.Changeset`).
 
 This library provides an a module you can `use` in your application's `MyApp.Repo`
-module: `Ecto.Repo.Hooks`. Upon invokation, any successful database
+module: `EctoHooks`. Upon invokation, any successful database
 `Ecto.Repo` callbacks will trigger any hooks you've defined in a corresponding
 `Ecto.Schema` module:
 
@@ -17,7 +17,7 @@ def MyApp.Repo do
     otp_app: :my_app,
     adapter: Ecto.Adapters.Postgres
 
-  use Ecto.Repo.Hooks
+  use EctoHooks
 end
 
 def MyApp.User do
@@ -60,7 +60,7 @@ are those that are executed following an appropriate `Ecto.Repo` callback.
 ## Links
 
 - [hex.pm package link](https://hex.pm/packages/ecto_hooks)
-- [online documentation](https://hexdocs.pm/ecto_hooks/Ecto.Repo.Hooks.html)
+- [online documentation](https://hexdocs.pm/ecto_hooks/EctoHooks.Repo.html)
 
 ## Installation
 
