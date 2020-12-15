@@ -128,6 +128,50 @@ defmodule Ecto.Repo.Hooks do
         |> super(opts)
         |> @hooks.after_delete
       end
+
+      def insert_or_update(
+            %Ecto.Changeset{data: %{__meta__: %{state: :built}}} = changeset,
+            opts
+          ) do
+        with {:ok, result} <- super(changeset, opts) do
+          {:ok, @hooks.after_insert(result)}
+        end
+      end
+
+      def insert_or_update!(
+            %Ecto.Changeset{data: %{__meta__: %{state: :built}}} = changeset,
+            opts
+          ) do
+        changeset
+        |> super(opts)
+        |> @hooks.after_insert
+      end
+
+      def insert_or_update(
+            %Ecto.Changeset{data: %{__meta__: %{state: :loaded}}} = changeset,
+            opts
+          ) do
+        with {:ok, result} <- super(changeset, opts) do
+          {:ok, @hooks.after_update(result)}
+        end
+      end
+
+      def insert_or_update!(
+            %Ecto.Changeset{data: %{__meta__: %{state: :loaded}}} = changeset,
+            opts
+          ) do
+        changeset
+        |> super(opts)
+        |> @hooks.after_update
+      end
+
+      def insert_or_update(changeset, opts) do
+        super(changeset, opts)
+      end
+
+      def insert_or_update!(changeset, opts) do
+        super(changeset, opts)
+      end
     end
   end
 
