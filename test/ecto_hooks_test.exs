@@ -96,6 +96,46 @@ defmodule Ecto.Repo.HooksTest do
                  |> Repo.insert!()
       end
     end
+
+    test "executes after successful Repo.insert_or_update/2 if it inserted" do
+      assert capture_log(fn ->
+               assert {:ok, user} =
+                        %User{}
+                        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+                        |> Repo.insert_or_update()
+
+               assert user.full_name == "Bob Dylan"
+             end) =~ "after insert"
+    end
+
+    test "executes after successful Repo.insert_or_update!/2 if it inserted" do
+      assert capture_log(fn ->
+               assert user =
+                        %User{}
+                        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+                        |> Repo.insert_or_update!()
+
+               assert user.full_name == "Bob Dylan"
+             end) =~ "after insert"
+    end
+
+    test "does not executes after unsuccessful Repo.insert_or_update/2 if it inserted" do
+      refute capture_log(fn ->
+               assert {:error, %Ecto.Changeset{}} =
+                        %User{}
+                        |> User.changeset(%{first_name: "Bob"})
+                        |> Repo.insert_or_update()
+             end) =~ "after insert"
+    end
+
+    test "does not executes after unsuccessful Repo.insert_or_update!/2 if it inserted" do
+      assert_raise Ecto.InvalidChangesetError, fn ->
+        assert %Ecto.Changeset{} =
+                 %User{}
+                 |> User.changeset(%{})
+                 |> Repo.insert_or_update!()
+      end
+    end
   end
 
   describe "after_update/1" do
@@ -153,6 +193,50 @@ defmodule Ecto.Repo.HooksTest do
                  user
                  |> User.changeset(%{last_name: ""})
                  |> Repo.update!()
+      end
+    end
+
+    test "executes after successful Repo.insert_or_update/2 if it updated", %{user: user} do
+      assert capture_log(fn ->
+               assert {:ok, user} =
+                        user
+                        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+                        |> Repo.insert_or_update()
+
+               assert user.full_name == "Bob Dylan"
+             end) =~ "after update"
+    end
+
+    test "executes after successful Repo.insert_or_update!/2 if it updated", %{user: user} do
+      assert capture_log(fn ->
+               assert user =
+                        user
+                        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+                        |> Repo.insert_or_update!()
+
+               assert user.full_name == "Bob Dylan"
+             end) =~ "after update"
+    end
+
+    test "does not executes after unsuccessful Repo.insert_or_update/2 if it updated", %{
+      user: user
+    } do
+      refute capture_log(fn ->
+               assert {:error, %Ecto.Changeset{}} =
+                        user
+                        |> User.changeset(%{last_name: nil})
+                        |> Repo.insert_or_update()
+             end) =~ "after update"
+    end
+
+    test "does not executes after unsuccessful Repo.insert_or_update!/2 if it updated", %{
+      user: user
+    } do
+      assert_raise Ecto.InvalidChangesetError, fn ->
+        assert %Ecto.Changeset{} =
+                 user
+                 |> User.changeset(%{last_name: nil})
+                 |> Repo.insert_or_update!()
       end
     end
   end
