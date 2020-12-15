@@ -30,6 +30,11 @@ defmodule Ecto.Repo.HooksTest do
       %__MODULE__{data | full_name: first_name <> " " <> last_name}
     end
 
+    def after_get(%__MODULE__{first_name: first_name, last_name: last_name} = data) do
+      Logger.info("after get")
+      %__MODULE__{data | full_name: first_name <> " " <> last_name}
+    end
+
     def changeset(%__MODULE__{} = user, attrs) do
       user
       |> cast(attrs, [:first_name, :last_name])
@@ -143,6 +148,45 @@ defmodule Ecto.Repo.HooksTest do
                  |> User.changeset(%{last_name: ""})
                  |> Repo.update!()
       end
+    end
+  end
+
+  describe "after_get/1" do
+    setup do
+      Logger.configure(level: :error)
+
+      {:ok, user} =
+        %User{}
+        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+        |> Repo.insert()
+
+      Logger.configure(level: :info)
+
+      {:ok, user: user}
+    end
+
+    test "executes after successful Repo.get/2", %{user: user} do
+      assert capture_log(fn ->
+               assert user = Repo.get(User, user.id)
+               assert user.full_name == "Bob Dylan"
+             end) =~ "after get"
+    end
+
+    test "executes after successful Repo.get!/2", %{user: user} do
+      assert capture_log(fn ->
+               assert user = Repo.get!(User, user.id)
+               assert user.full_name == "Bob Dylan"
+             end) =~ "after get"
+    end
+
+    test "does not executes after unsuccessful Repo.get/2" do
+      refute capture_log(fn ->
+               assert is_nil(Repo.get(User, 1))
+             end) =~ "after get"
+    end
+
+    test "does not executes after unsuccessful Repo.get!/2" do
+      assert_raise Ecto.NoResultsError, fn -> assert user = Repo.get!(User, 1) end
     end
   end
 end
