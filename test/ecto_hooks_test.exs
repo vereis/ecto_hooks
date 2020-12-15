@@ -25,6 +25,11 @@ defmodule Ecto.Repo.HooksTest do
       %__MODULE__{data | full_name: first_name <> " " <> last_name}
     end
 
+    def after_update(%__MODULE__{first_name: first_name, last_name: last_name} = data) do
+      Logger.info("after update")
+      %__MODULE__{data | full_name: first_name <> " " <> last_name}
+    end
+
     def changeset(%__MODULE__{} = user, attrs) do
       user
       |> cast(attrs, [:first_name, :last_name])
@@ -78,6 +83,65 @@ defmodule Ecto.Repo.HooksTest do
                  %User{}
                  |> User.changeset(%{})
                  |> Repo.insert!()
+      end
+    end
+  end
+
+  describe "after_update/1" do
+    setup do
+      Logger.configure(level: :error)
+
+      {:ok, user} =
+        %User{}
+        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+        |> Repo.insert()
+
+      Logger.configure(level: :info)
+
+      {:ok, user: user}
+    end
+
+    test "executes after successful Repo.update/2", %{user: user} do
+      assert capture_log(fn ->
+               assert user.full_name == "Bob Dylan"
+
+               assert {:ok, updated_user} =
+                        user
+                        |> User.changeset(%{last_name: "Marley"})
+                        |> Repo.update()
+
+               assert updated_user.full_name == "Bob Marley"
+             end) =~ "after update"
+    end
+
+    test "executes after successful Repo.update!/2", %{user: user} do
+      assert capture_log(fn ->
+               assert user.full_name == "Bob Dylan"
+
+               assert updated_user =
+                        user
+                        |> User.changeset(%{last_name: "Marley"})
+                        |> Repo.update!()
+
+               assert updated_user.full_name == "Bob Marley"
+             end) =~ "after update"
+    end
+
+    test "does not executes after unsuccessful Repo.update/2", %{user: user} do
+      refute capture_log(fn ->
+               assert {:error, %Ecto.Changeset{}} =
+                        user
+                        |> User.changeset(%{last_name: nil})
+                        |> Repo.update()
+             end) =~ "after update"
+    end
+
+    test "does not executes after unsuccessful Repo.update!/2", %{user: user} do
+      assert_raise Ecto.InvalidChangesetError, fn ->
+        assert %Ecto.Changeset{} =
+                 user
+                 |> User.changeset(%{last_name: ""})
+                 |> Repo.update!()
       end
     end
   end
