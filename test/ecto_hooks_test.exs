@@ -1,10 +1,8 @@
 defmodule Ecto.Repo.HooksTest do
   defmodule Repo do
-    use Ecto.Repo,
+    use EctoHooks.Repo,
       otp_app: :ecto_hooks,
       adapter: Etso.Adapter
-
-    use Ecto.Repo.Hooks
   end
 
   defmodule User do
