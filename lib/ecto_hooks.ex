@@ -98,6 +98,18 @@ defmodule Ecto.Repo.Hooks do
         |> super(clauses, opts)
         |> @hooks.after_get
       end
+
+      def one(query, opts) do
+        with %{__meta__: %Ecto.Schema.Metadata{}} = result <- super(query, opts) do
+          @hooks.after_get(result)
+        end
+      end
+
+      def one!(query, opts) do
+        query
+        |> super(opts)
+        |> @hooks.after_get
+      end
     end
   end
 
