@@ -62,6 +62,18 @@ defmodule Ecto.Repo.Hooks do
         |> super(opts)
         |> @hooks.after_insert
       end
+
+      def update(query, opts) do
+        with {:ok, result} <- super(query, opts) do
+          {:ok, @hooks.after_update(result)}
+        end
+      end
+
+      def update!(query, opts) do
+        query
+        |> super(opts)
+        |> @hooks.after_update
+      end
     end
   end
 
@@ -74,6 +86,18 @@ defmodule Ecto.Repo.Hooks do
   end
 
   def after_insert(data) do
+    data
+  end
+
+  def after_update(%schema{} = data) do
+    if function_exported?(schema, :after_update, 1) do
+      schema.after_update(data)
+    else
+      data
+    end
+  end
+
+  def after_update(data) do
     data
   end
 end
