@@ -74,6 +74,18 @@ defmodule Ecto.Repo.Hooks do
         |> super(opts)
         |> @hooks.after_update
       end
+
+      def get(query, id, opts) do
+        with %{__meta__: %Ecto.Schema.Metadata{}} = result <- super(query, id, opts) do
+          @hooks.after_get(result)
+        end
+      end
+
+      def get!(query, id, opts) do
+        query
+        |> super(id, opts)
+        |> @hooks.after_get
+      end
     end
   end
 
@@ -98,6 +110,18 @@ defmodule Ecto.Repo.Hooks do
   end
 
   def after_update(data) do
+    data
+  end
+
+  def after_get(%schema{} = data) do
+    if function_exported?(schema, :after_get, 1) do
+      schema.after_get(data)
+    else
+      data
+    end
+  end
+
+  def after_get(data) do
     data
   end
 end
