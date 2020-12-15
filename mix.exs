@@ -12,7 +12,10 @@ defmodule EctoHooks.MixProject do
       deps: deps(),
       dialyzer: [
         plt_file: {:no_warn, "priv/plts/dialyzer.plt"}
-      ]
+      ],
+      package: package(),
+      description: description(),
+      source_url: "https://github.com/vereis/build_you_a_telemetry"
     ]
   end
 
@@ -40,5 +43,23 @@ defmodule EctoHooks.MixProject do
 
   defp aliases do
     [lint: ["format --check-formatted --dry-run", "credo --strict", "dialyzer"]]
+  end
+
+  defp description() do
+    """
+    Extends `Ecto.Repo` callbacks to provide user implementable hooks for given `Ecto.Schema`
+    implementations.
+
+    See project `README.md` for more details
+    """
+  end
+
+  defp package() do
+    [
+      licenses: ["MIT"],
+      links: %{
+        "GitHub" => "https://github.com/vereis/ecto_hooks"
+      }
+    ]
   end
 end
