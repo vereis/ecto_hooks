@@ -5,7 +5,7 @@ defmodule EctoHooks.MixProject do
     [
       aliases: aliases(),
       app: :ecto_hooks,
-      version: "0.2.0",
+      version: "0.2.1",
       elixir: "~> 1.10",
       elixirrc_options: [warnings_as_errors: true],
       start_permanent: Mix.env() == :prod,
@@ -15,7 +15,7 @@ defmodule EctoHooks.MixProject do
       ],
       package: package(),
       description: description(),
-      source_url: "https://github.com/vereis/build_you_a_telemetry"
+      source_url: "https://github.com/vereis/ecto_hooks"
     ]
   end
 
@@ -47,10 +47,11 @@ defmodule EctoHooks.MixProject do
 
   defp description() do
     """
-    Extends `Ecto.Repo` callbacks to provide user implementable hooks for given `Ecto.Schema`
-    implementations.
+    Based on the now removed functions available in `Ecto.Model`.
 
-    See project `README.md` for more details
+    Provides optional callbacks: `after_insert/1`, `after_update/1`, `after_get/1` and `after_delete/1`
+    which execute following `Ecto.Repo` callbacks for your `Ecto.Schema` modules to simplify using
+    virtual fields and more!
     """
   end
 
