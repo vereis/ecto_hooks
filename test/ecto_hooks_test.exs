@@ -5,7 +5,46 @@ defmodule Ecto.Repo.HooksTest do
       adapter: Etso.Adapter
   end
 
-  defmodule User do
+  defmodule BeforeHooksUser do
+    use Ecto.Schema
+    import Ecto.Changeset
+
+    require Logger
+
+    schema "user" do
+      field(:first_name, :string)
+      field(:last_name, :string)
+
+      field(:full_name, :string, virtual: true)
+    end
+
+    def before_insert(%Ecto.Changeset{} = changeset) do
+      Logger.info("before insert")
+
+      changeset
+      |> put_change(:last_name, "Before Insert")
+    end
+
+    def before_update(%Ecto.Changeset{} = changeset) do
+      Logger.info("before update")
+
+      changeset
+      |> put_change(:last_name, "Before Update")
+    end
+
+    def before_delete(%__MODULE__{} = struct) do
+      Logger.info("before delete")
+      struct
+    end
+
+    def changeset(%__MODULE__{} = user, attrs) do
+      user
+      |> cast(attrs, [:first_name, :last_name])
+      |> validate_required([:first_name, :last_name])
+    end
+  end
+
+  defmodule AfterHooksUser do
     use Ecto.Schema
     import Ecto.Changeset
 
@@ -45,7 +84,7 @@ defmodule Ecto.Repo.HooksTest do
     end
   end
 
-  use ExUnit.Case
+  use ExUnit.Case, async: false
   import ExUnit.CaptureLog
   import Ecto.Query
 
@@ -54,83 +93,315 @@ defmodule Ecto.Repo.HooksTest do
     :ok
   end
 
+  describe "before_insert/1" do
+    setup do
+      Logger.configure(level: :info)
+    end
+
+    test "executes before successful Repo.insert/2" do
+      # Silence before_hook log message
+      Logger.configure(level: :error)
+
+      assert {:ok, user} =
+               %BeforeHooksUser{}
+               |> BeforeHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
+               |> Repo.insert()
+
+      assert user.last_name == "Before Insert"
+    end
+
+    test "executes before successful Repo.insert!/2" do
+      # Silence before_hook log message
+      Logger.configure(level: :error)
+
+      assert user =
+               %BeforeHooksUser{}
+               |> BeforeHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
+               |> Repo.insert!()
+
+      assert user.last_name == "Before Insert"
+    end
+
+    test "executes before unsuccessful Repo.insert/2" do
+      assert capture_log(fn ->
+               assert {:error, %Ecto.Changeset{}} =
+                        %BeforeHooksUser{}
+                        |> BeforeHooksUser.changeset(%{})
+                        |> Repo.insert()
+             end) =~ "before insert"
+    end
+
+    test "executes before unsuccessful Repo.insert!/2" do
+      assert capture_log(fn ->
+               assert_raise Ecto.InvalidChangesetError, fn ->
+                 assert %Ecto.Changeset{} =
+                          %BeforeHooksUser{}
+                          |> BeforeHooksUser.changeset(%{})
+                          |> Repo.insert!()
+               end
+             end) =~ "before insert"
+    end
+
+    test "executes before successful Repo.insert_or_update/2 if it inserted" do
+      # Silence before_hook log message
+      Logger.configure(level: :error)
+
+      assert {:ok, user} =
+               %BeforeHooksUser{}
+               |> BeforeHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
+               |> Repo.insert_or_update()
+
+      assert user.last_name == "Before Insert"
+    end
+
+    test "executes before successful Repo.insert_or_update!/2 if it inserted" do
+      # Silence before_hook log message
+      Logger.configure(level: :error)
+
+      assert user =
+               %BeforeHooksUser{}
+               |> BeforeHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
+               |> Repo.insert_or_update!()
+
+      assert user.last_name == "Before Insert"
+    end
+
+    test "executes before unsuccessful Repo.insert_or_update/2 if it inserted" do
+      assert capture_log(fn ->
+               assert {:error, %Ecto.Changeset{}} =
+                        %BeforeHooksUser{}
+                        |> BeforeHooksUser.changeset(%{first_name: "Bob"})
+                        |> Repo.insert_or_update()
+             end) =~ "before insert"
+    end
+
+    test "executes before unsuccessful Repo.insert_or_update!/2 if it inserted" do
+      assert capture_log(fn ->
+               assert_raise Ecto.InvalidChangesetError, fn ->
+                 assert %Ecto.Changeset{} =
+                          %BeforeHooksUser{}
+                          |> BeforeHooksUser.changeset(%{})
+                          |> Repo.insert_or_update!()
+               end
+             end) =~ "before insert"
+    end
+  end
+
+  describe "before_update/1" do
+    setup do
+      Logger.configure(level: :error)
+
+      {:ok, user} =
+        %BeforeHooksUser{}
+        |> BeforeHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
+        |> Repo.insert()
+
+      Logger.configure(level: :info)
+
+      {:ok, user: user}
+    end
+
+    test "executes before successful Repo.update/2", %{user: user} do
+      # Silence before_hook log message
+      Logger.configure(level: :error)
+
+      assert {:ok, updated_user} =
+               user
+               |> BeforeHooksUser.changeset(%{last_name: "Marley"})
+               |> Repo.update()
+
+      assert updated_user.last_name == "Before Update"
+    end
+
+    test "executes before successful Repo.update!/2", %{user: user} do
+      assert capture_log(fn ->
+               user
+               |> BeforeHooksUser.changeset(%{last_name: "Marley"})
+               |> Repo.update!()
+             end) =~ "before update"
+    end
+
+    test "executes before unsuccessful Repo.update/2", %{user: user} do
+      assert capture_log(fn ->
+               assert {:error, %Ecto.Changeset{}} =
+                        user
+                        |> BeforeHooksUser.changeset(%{last_name: nil})
+                        |> Repo.update()
+             end) =~ "before update"
+    end
+
+    test "executes before unsuccessful Repo.update!/2", %{user: user} do
+      assert capture_log(fn ->
+               assert_raise Ecto.InvalidChangesetError, fn ->
+                 assert %Ecto.Changeset{} =
+                          user
+                          |> BeforeHooksUser.changeset(%{last_name: ""})
+                          |> Repo.update!()
+               end
+             end) =~ "before update"
+    end
+
+    test "executes before successful Repo.insert_or_update/2 if it updated", %{user: user} do
+      # Silence before_hook log message
+      Logger.configure(level: :error)
+
+      assert {:ok, user} =
+               user
+               |> BeforeHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
+               |> Repo.insert_or_update()
+
+      assert user.last_name == "Before Update"
+    end
+
+    test "executes before successful Repo.insert_or_update!/2 if it updated", %{user: user} do
+      # Silence before_hook log message
+      Logger.configure(level: :error)
+
+      assert user =
+               user
+               |> BeforeHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
+               |> Repo.insert_or_update!()
+
+      assert user.last_name == "Before Update"
+    end
+
+    test "executes before unsuccessful Repo.insert_or_update/2 if it updated", %{
+      user: user
+    } do
+      assert capture_log(fn ->
+               assert {:error, %Ecto.Changeset{}} =
+                        user
+                        |> BeforeHooksUser.changeset(%{last_name: nil})
+                        |> Repo.insert_or_update()
+             end) =~ "before update"
+    end
+
+    test "executes before unsuccessful Repo.insert_or_update!/2 if it updated", %{
+      user: user
+    } do
+      assert capture_log(fn ->
+               assert_raise Ecto.InvalidChangesetError, fn ->
+                 assert %Ecto.Changeset{} =
+                          user
+                          |> BeforeHooksUser.changeset(%{last_name: nil})
+                          |> Repo.insert_or_update!()
+               end
+             end) =~ "before update"
+    end
+  end
+
+  describe "before_delete/1" do
+    setup do
+      Logger.configure(level: :error)
+
+      {:ok, user} =
+        %BeforeHooksUser{}
+        |> BeforeHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
+        |> Repo.insert()
+
+      Logger.configure(level: :info)
+
+      {:ok, user: user}
+    end
+
+    test "executes before successful Repo.delete/2", %{user: user} do
+      assert capture_log(fn ->
+               assert {:ok, deleted_user} = Repo.delete(user)
+             end) =~ "before delete"
+    end
+
+    test "executes before successful Repo.delete!/2", %{user: user} do
+      assert capture_log(fn ->
+               assert deleted_user = Repo.delete!(user)
+             end) =~ "before delete"
+    end
+
+    test "executes before unsuccessful Repo.delete!/2" do
+      assert capture_log(fn ->
+               assert_raise Ecto.NoPrimaryKeyValueError, fn ->
+                 assert Repo.delete!(%BeforeHooksUser{})
+               end
+             end) =~ "before delete"
+    end
+  end
+
   describe "after_insert/1" do
-    test "executes after successful Repo.insert/2" do
+    test "executes before successful Repo.insert/2" do
       assert capture_log(fn ->
                assert {:ok, user} =
-                        %User{}
-                        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+                        %AfterHooksUser{}
+                        |> AfterHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
                         |> Repo.insert()
 
                assert user.full_name == "Bob Dylan"
              end) =~ "after insert"
     end
 
-    test "executes after successful Repo.insert!/2" do
+    test "executes before successful Repo.insert!/2" do
       assert capture_log(fn ->
                assert user =
-                        %User{}
-                        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+                        %AfterHooksUser{}
+                        |> AfterHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
                         |> Repo.insert!()
 
                assert user.full_name == "Bob Dylan"
              end) =~ "after insert"
     end
 
-    test "does not executes after unsuccessful Repo.insert/2" do
+    test "does not executes before unsuccessful Repo.insert/2" do
       refute capture_log(fn ->
                assert {:error, %Ecto.Changeset{}} =
-                        %User{}
-                        |> User.changeset(%{})
+                        %AfterHooksUser{}
+                        |> AfterHooksUser.changeset(%{})
                         |> Repo.insert()
              end) =~ "after insert"
     end
 
-    test "does not executes after unsuccessful Repo.insert!/2" do
+    test "does not executes before unsuccessful Repo.insert!/2" do
       assert_raise Ecto.InvalidChangesetError, fn ->
         assert %Ecto.Changeset{} =
-                 %User{}
-                 |> User.changeset(%{})
+                 %AfterHooksUser{}
+                 |> AfterHooksUser.changeset(%{})
                  |> Repo.insert!()
       end
     end
 
-    test "executes after successful Repo.insert_or_update/2 if it inserted" do
+    test "executes before successful Repo.insert_or_update/2 if it inserted" do
       assert capture_log(fn ->
                assert {:ok, user} =
-                        %User{}
-                        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+                        %AfterHooksUser{}
+                        |> AfterHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
                         |> Repo.insert_or_update()
 
                assert user.full_name == "Bob Dylan"
              end) =~ "after insert"
     end
 
-    test "executes after successful Repo.insert_or_update!/2 if it inserted" do
+    test "executes before successful Repo.insert_or_update!/2 if it inserted" do
       assert capture_log(fn ->
                assert user =
-                        %User{}
-                        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+                        %AfterHooksUser{}
+                        |> AfterHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
                         |> Repo.insert_or_update!()
 
                assert user.full_name == "Bob Dylan"
              end) =~ "after insert"
     end
 
-    test "does not executes after unsuccessful Repo.insert_or_update/2 if it inserted" do
+    test "does not executes before unsuccessful Repo.insert_or_update/2 if it inserted" do
       refute capture_log(fn ->
                assert {:error, %Ecto.Changeset{}} =
-                        %User{}
-                        |> User.changeset(%{first_name: "Bob"})
+                        %AfterHooksUser{}
+                        |> AfterHooksUser.changeset(%{first_name: "Bob"})
                         |> Repo.insert_or_update()
              end) =~ "after insert"
     end
 
-    test "does not executes after unsuccessful Repo.insert_or_update!/2 if it inserted" do
+    test "does not executes before unsuccessful Repo.insert_or_update!/2 if it inserted" do
       assert_raise Ecto.InvalidChangesetError, fn ->
         assert %Ecto.Changeset{} =
-                 %User{}
-                 |> User.changeset(%{})
+                 %AfterHooksUser{}
+                 |> AfterHooksUser.changeset(%{})
                  |> Repo.insert_or_update!()
       end
     end
@@ -141,8 +412,8 @@ defmodule Ecto.Repo.HooksTest do
       Logger.configure(level: :error)
 
       {:ok, user} =
-        %User{}
-        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+        %AfterHooksUser{}
+        |> AfterHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
         |> Repo.insert()
 
       Logger.configure(level: :info)
@@ -156,7 +427,7 @@ defmodule Ecto.Repo.HooksTest do
 
                assert {:ok, updated_user} =
                         user
-                        |> User.changeset(%{last_name: "Marley"})
+                        |> AfterHooksUser.changeset(%{last_name: "Marley"})
                         |> Repo.update()
 
                assert updated_user.full_name == "Bob Marley"
@@ -169,7 +440,7 @@ defmodule Ecto.Repo.HooksTest do
 
                assert updated_user =
                         user
-                        |> User.changeset(%{last_name: "Marley"})
+                        |> AfterHooksUser.changeset(%{last_name: "Marley"})
                         |> Repo.update!()
 
                assert updated_user.full_name == "Bob Marley"
@@ -180,7 +451,7 @@ defmodule Ecto.Repo.HooksTest do
       refute capture_log(fn ->
                assert {:error, %Ecto.Changeset{}} =
                         user
-                        |> User.changeset(%{last_name: nil})
+                        |> AfterHooksUser.changeset(%{last_name: nil})
                         |> Repo.update()
              end) =~ "after update"
     end
@@ -189,7 +460,7 @@ defmodule Ecto.Repo.HooksTest do
       assert_raise Ecto.InvalidChangesetError, fn ->
         assert %Ecto.Changeset{} =
                  user
-                 |> User.changeset(%{last_name: ""})
+                 |> AfterHooksUser.changeset(%{last_name: ""})
                  |> Repo.update!()
       end
     end
@@ -198,7 +469,7 @@ defmodule Ecto.Repo.HooksTest do
       assert capture_log(fn ->
                assert {:ok, user} =
                         user
-                        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+                        |> AfterHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
                         |> Repo.insert_or_update()
 
                assert user.full_name == "Bob Dylan"
@@ -209,7 +480,7 @@ defmodule Ecto.Repo.HooksTest do
       assert capture_log(fn ->
                assert user =
                         user
-                        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+                        |> AfterHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
                         |> Repo.insert_or_update!()
 
                assert user.full_name == "Bob Dylan"
@@ -222,7 +493,7 @@ defmodule Ecto.Repo.HooksTest do
       refute capture_log(fn ->
                assert {:error, %Ecto.Changeset{}} =
                         user
-                        |> User.changeset(%{last_name: nil})
+                        |> AfterHooksUser.changeset(%{last_name: nil})
                         |> Repo.insert_or_update()
              end) =~ "after update"
     end
@@ -233,7 +504,7 @@ defmodule Ecto.Repo.HooksTest do
       assert_raise Ecto.InvalidChangesetError, fn ->
         assert %Ecto.Changeset{} =
                  user
-                 |> User.changeset(%{last_name: nil})
+                 |> AfterHooksUser.changeset(%{last_name: nil})
                  |> Repo.insert_or_update!()
       end
     end
@@ -244,8 +515,8 @@ defmodule Ecto.Repo.HooksTest do
       Logger.configure(level: :error)
 
       {:ok, user} =
-        %User{}
-        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+        %AfterHooksUser{}
+        |> AfterHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
         |> Repo.insert()
 
       Logger.configure(level: :info)
@@ -255,58 +526,58 @@ defmodule Ecto.Repo.HooksTest do
 
     test "executes after successful Repo.get/2", %{user: user} do
       assert capture_log(fn ->
-               assert user = Repo.get(User, user.id)
+               assert user = Repo.get(AfterHooksUser, user.id)
                assert user.full_name == "Bob Dylan"
              end) =~ "after get"
     end
 
     test "executes after successful Repo.get!/2", %{user: user} do
       assert capture_log(fn ->
-               assert user = Repo.get!(User, user.id)
+               assert user = Repo.get!(AfterHooksUser, user.id)
                assert user.full_name == "Bob Dylan"
              end) =~ "after get"
     end
 
     test "does not executes after unsuccessful Repo.get/2" do
       refute capture_log(fn ->
-               assert is_nil(Repo.get(User, 1))
+               assert is_nil(Repo.get(AfterHooksUser, 1))
              end) =~ "after get"
     end
 
     test "does not executes after unsuccessful Repo.get!/2" do
-      assert_raise Ecto.NoResultsError, fn -> assert user = Repo.get!(User, 1) end
+      assert_raise Ecto.NoResultsError, fn -> assert user = Repo.get!(AfterHooksUser, 1) end
     end
 
     test "executes after successful Repo.get_by/2", %{user: user} do
       assert capture_log(fn ->
-               assert user = Repo.get_by(User, first_name: user.first_name)
+               assert user = Repo.get_by(AfterHooksUser, first_name: user.first_name)
                assert user.full_name == "Bob Dylan"
              end) =~ "after get"
     end
 
     test "executes after successful Repo.get_by!/2", %{user: user} do
       assert capture_log(fn ->
-               assert user = Repo.get_by!(User, first_name: user.first_name)
+               assert user = Repo.get_by!(AfterHooksUser, first_name: user.first_name)
                assert user.full_name == "Bob Dylan"
              end) =~ "after get"
     end
 
     test "does not executes after unsuccessful Repo.get_by/2" do
       refute capture_log(fn ->
-               assert is_nil(Repo.get_by(User, first_name: "Amy"))
+               assert is_nil(Repo.get_by(AfterHooksUser, first_name: "Amy"))
              end) =~ "after get"
     end
 
     test "does not executes after unsuccessful Repo.get_by!/2" do
       assert_raise Ecto.NoResultsError, fn ->
-        assert user = Repo.get_by!(User, first_name: "Amy")
+        assert user = Repo.get_by!(AfterHooksUser, first_name: "Amy")
       end
     end
 
     test "executes after successful Repo.one/2", %{user: user} do
       assert capture_log(fn ->
                user_id = user.id
-               query = from(u in User, where: u.id == ^user_id)
+               query = from(u in AfterHooksUser, where: u.id == ^user_id)
                assert user = Repo.one(query)
                assert user.full_name == "Bob Dylan"
              end) =~ "after get"
@@ -315,7 +586,7 @@ defmodule Ecto.Repo.HooksTest do
     test "executes after successful Repo.one!/2", %{user: user} do
       assert capture_log(fn ->
                user_id = user.id
-               query = from(u in User, where: u.id == ^user_id)
+               query = from(u in AfterHooksUser, where: u.id == ^user_id)
                assert user = Repo.one!(query)
                assert user.full_name == "Bob Dylan"
              end) =~ "after get"
@@ -323,14 +594,14 @@ defmodule Ecto.Repo.HooksTest do
 
     test "does not executes after unsuccessful Repo.one/2" do
       refute capture_log(fn ->
-               query = from(u in User, where: u.id == 999)
+               query = from(u in AfterHooksUser, where: u.id == 999)
                assert is_nil(Repo.one(query))
              end) =~ "after get"
     end
 
     test "does not executes after unsuccessful Repo.one!/2" do
       assert_raise Ecto.NoResultsError, fn ->
-        query = from(u in User, where: u.id == 999)
+        query = from(u in AfterHooksUser, where: u.id == 999)
         assert is_nil(Repo.one!(query))
       end
     end
@@ -338,7 +609,7 @@ defmodule Ecto.Repo.HooksTest do
     test "executes after successful Repo.all/2", %{user: user} do
       assert capture_log(fn ->
                user_id = user.id
-               query = from(u in User, where: u.id == ^user_id)
+               query = from(u in AfterHooksUser, where: u.id == ^user_id)
                assert [user] = Repo.all(query)
                assert user.full_name == "Bob Dylan"
              end) =~ "after get"
@@ -346,7 +617,7 @@ defmodule Ecto.Repo.HooksTest do
 
     test "does not executes after unsuccessful Repo.all/2" do
       refute capture_log(fn ->
-               query = from(u in User, where: u.id == 999)
+               query = from(u in AfterHooksUser, where: u.id == 999)
                assert [] = Repo.all(query)
              end) =~ "after get"
     end
@@ -357,8 +628,8 @@ defmodule Ecto.Repo.HooksTest do
       Logger.configure(level: :error)
 
       {:ok, user} =
-        %User{}
-        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+        %AfterHooksUser{}
+        |> AfterHooksUser.changeset(%{first_name: "Bob", last_name: "Dylan"})
         |> Repo.insert()
 
       Logger.configure(level: :info)
@@ -382,7 +653,7 @@ defmodule Ecto.Repo.HooksTest do
 
     test "does not executes after unsuccessful Repo.delete!/2" do
       assert_raise Ecto.NoPrimaryKeyValueError, fn ->
-        assert Repo.delete!(%User{})
+        assert Repo.delete!(%AfterHooksUser{})
       end
     end
   end

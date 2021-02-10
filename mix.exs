@@ -5,7 +5,7 @@ defmodule EctoHooks.MixProject do
     [
       aliases: aliases(),
       app: :ecto_hooks,
-      version: "0.2.1",
+      version: "0.3.0",
       elixir: "~> 1.10",
       elixirrc_options: [warnings_as_errors: true],
       start_permanent: Mix.env() == :prod,
@@ -47,11 +47,10 @@ defmodule EctoHooks.MixProject do
 
   defp description() do
     """
-    Based on the now removed functions available in `Ecto.Model`.
+    Adds callbacks/hooks to Ecto: `after_insert`, `after_update`, `after_delete`,
+    `after_get`, `before_insert`, `before_update`, `before_delete`.
 
-    Provides optional callbacks: `after_insert/1`, `after_update/1`, `after_get/1` and `after_delete/1`
-    which execute following `Ecto.Repo` callbacks for your `Ecto.Schema` modules to simplify using
-    virtual fields and more!
+    Useful for setting virtual fields and centralising logic.
     """
   end
 

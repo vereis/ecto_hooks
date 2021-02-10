@@ -22,12 +22,18 @@ end
 
 def MyApp.User do
   use Ecto.Changeset
+  require Logger
 
   schema "users" do
     field :first_name, :string
     field :last_name, :string
 
     field :full_name, :string, virtual: true
+  end
+
+  def before_insert(%Ecto.Changeset{} = changeset) do
+    Logger.info("inserting new user")
+    changeset
   end
 
   def after_get(%__MODULE__{first_name: first_name, last_name: last_name} = user) do
@@ -52,10 +58,6 @@ virtual fields, but can also prove useful for centralising some logging or telem
 logic. Note that because any business logic is executed synchronously after the
 hooked `Ecto.Repo` callback, one should avoid doing any blocking or potentially
 terminating logic within hooks as weird or strange behaviour may occur.
-
-At the time of writing, this library does not intend on implementing any hooks
-for executing logic _before_ a database operation. The only hooks implemented
-are those that are executed following an appropriate `Ecto.Repo` callback.
 
 ## Links
 
@@ -104,4 +106,12 @@ A list of valid hooks is listed below:
     `Ecto.Repo.update!/2`, `Ecto.Repo.insert_or_update/2`,
     `Ecto.Repo.insert_or_update!/2`
 - `after_delete/1` which is executed following `Ecto.Repo.delete/2`,
+    `Ecto.Repo.delete!/2`
+- `before_insert/1` which is executed prior to an `Ecto.Repo.insert/2`,
+    `Ecto.Repo.insert!/2`, `Ecto.Repo.insert_or_update/2`,
+    `Ecto.Repo.insert_or_update!/2`
+- `before_update/1` which is executed prior to an `Ecto.Repo.update/2`,
+    `Ecto.Repo.update!/2`, `Ecto.Repo.insert_or_update/2`,
+    `Ecto.Repo.insert_or_update!/2`
+- `before_delete/1` which is executed prior to an `Ecto.Repo.delete/2`,
     `Ecto.Repo.delete!/2`
