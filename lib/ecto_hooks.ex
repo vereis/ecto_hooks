@@ -212,51 +212,18 @@ defmodule EctoHooks do
     end
   end
 
-  def after_insert(%schema{} = data) do
-    if function_exported?(schema, :after_insert, 1) do
-      schema.after_insert(data)
-    else
+  @after_callbacks [:after_delete, :after_get, :after_insert, :after_update]
+  for callback <- @after_callbacks do
+    def unquote(callback)(%schema{} = data) do
+      if function_exported?(schema, unquote(callback), 1) do
+        schema.unquote(callback)(data)
+      else
+        data
+      end
+    end
+
+    def unquote(callback)(data) do
       data
     end
-  end
-
-  def after_insert(data) do
-    data
-  end
-
-  def after_update(%schema{} = data) do
-    if function_exported?(schema, :after_update, 1) do
-      schema.after_update(data)
-    else
-      data
-    end
-  end
-
-  def after_update(data) do
-    data
-  end
-
-  def after_get(%schema{} = data) do
-    if function_exported?(schema, :after_get, 1) do
-      schema.after_get(data)
-    else
-      data
-    end
-  end
-
-  def after_get(data) do
-    data
-  end
-
-  def after_delete(%schema{} = data) do
-    if function_exported?(schema, :after_delete, 1) do
-      schema.after_delete(data)
-    else
-      data
-    end
-  end
-
-  def after_delete(data) do
-    data
   end
 end
