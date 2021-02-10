@@ -29,11 +29,33 @@ defmodule EctoHooks do
   - `insert_or_update/2`
   - `insert_or_update!/2`
 
-  Please note that the result of executing a hook is the result ultimately returned
-  a user, and thus you should aim to only modify a given database result.
+  Hooks to `MyApp.EctoSchema.before_delete/1`:
+  - `delete/2`
+  - `delete!/2`
+
+  Hooks to `MyApp.EctoSchema.before_insert/1`:
+  - `insert/2`
+  - `insert!/2`
+
+  Hooks to `MyApp.EctoSchema.before_update/1`:
+  - `update/2`
+  - `update!/2`
+
+  Hooks to `MyApp.EctoSchema.before_insert/1` or to `MyApp.Ecto.Schema.before_update/1`:
+  - `insert_or_update/2`
+  - `insert_or_update!/2`
+
+  Please note that for all `after_*` hooks, the result of executing a `MyApp.Repo.*` callback
+  is what ultimately gets returned from the hook, and thus you should aim to write logic
+  that is transparent and does not break the expected semantics or behaviour of said
+  callback.
 
   Any results wrapped within an `{:ok, _}` or `{:error, _}` are also returned re-wrapped
   as expected.
+
+  For all `before_*` hooks, the result returned by hook is passed directly to the `MyApp.Repo.*`
+  callback called and thus care must be made to be aware of any implicit changes to changesets
+  prior to writing to the database.
 
   The hooking functionality provided by `EctoHooks` can be pretty useful for resolving
   virtual fields, but can also prove useful for centralising some logging or telemetry
@@ -54,11 +76,18 @@ defmodule EctoHooks do
   def MyApp.User do
     use Ecto.Changeset
 
+    require Logger
+
     schema "users" do
       field :first_name, :string
       field :last_name, :string
 
       field :full_name, :string, virtual: true
+    end
+
+    def before_insert(changeset) do
+      Logger.warning("updating a user...")
+      changeset
     end
 
     def after_get(%__MODULE__{first_name: first_name, last_name: last_name} = user) do
@@ -88,26 +117,32 @@ defmodule EctoHooks do
                      update: 2,
                      update!: 2
 
-      def insert(query, opts) do
-        with {:ok, result} <- super(query, opts) do
+      def insert(changeset, opts) do
+        changeset = @hooks.before_insert(changeset)
+
+        with {:ok, result} <- super(changeset, opts) do
           {:ok, @hooks.after_insert(result)}
         end
       end
 
-      def insert!(query, opts) do
-        query
+      def insert!(changeset, opts) do
+        changeset
+        |> @hooks.before_insert
         |> super(opts)
         |> @hooks.after_insert
       end
 
-      def update(query, opts) do
-        with {:ok, result} <- super(query, opts) do
+      def update(changeset, opts) do
+        changeset = @hooks.before_update(changeset)
+
+        with {:ok, result} <- super(changeset, opts) do
           {:ok, @hooks.after_update(result)}
         end
       end
 
-      def update!(query, opts) do
-        query
+      def update!(changeset, opts) do
+        changeset
+        |> @hooks.before_update
         |> super(opts)
         |> @hooks.after_update
       end
@@ -154,56 +189,65 @@ defmodule EctoHooks do
         |> Enum.map(&@hooks.after_get/1)
       end
 
-      def delete(query, opts) do
-        with {:ok, result} <- super(query, opts) do
+      def delete(changeset_or_query, opts) do
+        changeset_or_query = @hooks.before_delete(changeset_or_query)
+
+        with {:ok, result} <- super(changeset_or_query, opts) do
           {:ok, @hooks.after_delete(result)}
         end
       end
 
-      def delete!(query, opts) do
-        query
+      def delete!(changeset_or_query, opts) do
+        changeset_or_query
+        |> @hooks.before_delete
         |> super(opts)
         |> @hooks.after_delete
       end
 
       def insert_or_update(
-            %Ecto.Changeset{data: %{__meta__: %{state: :built}}} = changeset,
-            opts
-          ) do
-        with {:ok, result} <- super(changeset, opts) do
-          {:ok, @hooks.after_insert(result)}
-        end
-      end
-
-      def insert_or_update!(
-            %Ecto.Changeset{data: %{__meta__: %{state: :built}}} = changeset,
-            opts
-          ) do
-        changeset
-        |> super(opts)
-        |> @hooks.after_insert
-      end
-
-      def insert_or_update(
             %Ecto.Changeset{data: %{__meta__: %{state: :loaded}}} = changeset,
             opts
           ) do
+        changeset = @hooks.before_update(changeset)
+
         with {:ok, result} <- super(changeset, opts) do
           {:ok, @hooks.after_update(result)}
         end
       end
 
+      def insert_or_update(
+            %Ecto.Changeset{data: %{__meta__: %{state: :built}}} = changeset,
+            opts
+          ) do
+        changeset = @hooks.before_insert(changeset)
+
+        with {:ok, result} <- super(changeset, opts) do
+          {:ok, @hooks.after_insert(result)}
+        end
+      end
+
+      def insert_or_update(changeset, opts) do
+        super(changeset, opts)
+      end
+
       def insert_or_update!(
             %Ecto.Changeset{data: %{__meta__: %{state: :loaded}}} = changeset,
             opts
           ) do
         changeset
+        |> @hooks.before_update
         |> super(opts)
         |> @hooks.after_update
       end
 
-      def insert_or_update(changeset, opts) do
-        super(changeset, opts)
+      def insert_or_update!(
+            %Ecto.Changeset{data: %{__meta__: %{state: :built}}} = changeset,
+            opts
+          ) do
+        changeset
+        |> @hooks.before_insert
+        |> super(opts)
+        |> @hooks.after_insert
       end
 
       def insert_or_update!(changeset, opts) do
@@ -212,51 +256,44 @@ defmodule EctoHooks do
     end
   end
 
-  def after_insert(%schema{} = data) do
-    if function_exported?(schema, :after_insert, 1) do
-      schema.after_insert(data)
-    else
-      data
+  @before_callbacks [:before_delete, :before_insert, :before_update]
+  @after_callbacks [:after_delete, :after_get, :after_insert, :after_update]
+
+  for callback <- @before_callbacks do
+    @doc false
+    def unquote(callback)(%{__struct__: Ecto.Changeset, data: %schema{}} = changeset) do
+      if function_exported?(schema, unquote(callback), 1) do
+        schema.unquote(callback)(changeset)
+      else
+        changeset
+      end
+    end
+
+    def unquote(callback)(%schema{} = data) do
+      if function_exported?(schema, unquote(callback), 1) do
+        schema.unquote(callback)(data)
+      else
+        data
+      end
+    end
+
+    def unquote(callback)(changeset) do
+      changeset
     end
   end
 
-  def after_insert(data) do
-    data
-  end
+  for callback <- @after_callbacks do
+    @doc false
+    def unquote(callback)(%schema{} = data) do
+      if function_exported?(schema, unquote(callback), 1) do
+        schema.unquote(callback)(data)
+      else
+        data
+      end
+    end
 
-  def after_update(%schema{} = data) do
-    if function_exported?(schema, :after_update, 1) do
-      schema.after_update(data)
-    else
+    def unquote(callback)(data) do
       data
     end
-  end
-
-  def after_update(data) do
-    data
-  end
-
-  def after_get(%schema{} = data) do
-    if function_exported?(schema, :after_get, 1) do
-      schema.after_get(data)
-    else
-      data
-    end
-  end
-
-  def after_get(data) do
-    data
-  end
-
-  def after_delete(%schema{} = data) do
-    if function_exported?(schema, :after_delete, 1) do
-      schema.after_delete(data)
-    else
-      data
-    end
-  end
-
-  def after_delete(data) do
-    data
   end
 end
