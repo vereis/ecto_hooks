@@ -29,11 +29,33 @@ defmodule EctoHooks do
   - `insert_or_update/2`
   - `insert_or_update!/2`
 
-  Please note that the result of executing a hook is the result ultimately returned
-  a user, and thus you should aim to only modify a given database result.
+  Hooks to `MyApp.EctoSchema.before_delete/1`:
+  - `delete/2`
+  - `delete!/2`
+
+  Hooks to `MyApp.EctoSchema.before_insert/1`:
+  - `insert/2`
+  - `insert!/2`
+
+  Hooks to `MyApp.EctoSchema.before_update/1`:
+  - `update/2`
+  - `update!/2`
+
+  Hooks to `MyApp.EctoSchema.before_insert/1` or to `MyApp.Ecto.Schema.before_update/1`:
+  - `insert_or_update/2`
+  - `insert_or_update!/2`
+
+  Please note that for all `after_*` hooks, the result of executing a `MyApp.Repo.*` callback
+  is what ultimately gets returned from the hook, and thus you should aim to write logic
+  that is transparent and does not break the expected semantics or behaviour of said
+  callback.
 
   Any results wrapped within an `{:ok, _}` or `{:error, _}` are also returned re-wrapped
   as expected.
+
+  For all `before_*` hooks, the result returned by hook is passed directly to the `MyApp.Repo.*`
+  callback called and thus care must be made to be aware of any implicit changes to changesets
+  prior to writing to the database.
 
   The hooking functionality provided by `EctoHooks` can be pretty useful for resolving
   virtual fields, but can also prove useful for centralising some logging or telemetry
@@ -54,11 +76,18 @@ defmodule EctoHooks do
   def MyApp.User do
     use Ecto.Changeset
 
+    require Logger
+
     schema "users" do
       field :first_name, :string
       field :last_name, :string
 
       field :full_name, :string, virtual: true
+    end
+
+    def before_insert(changeset) do
+      Logger.warning("updating a user...")
+      changeset
     end
 
     def after_get(%__MODULE__{first_name: first_name, last_name: last_name} = user) do
@@ -231,6 +260,7 @@ defmodule EctoHooks do
   @after_callbacks [:after_delete, :after_get, :after_insert, :after_update]
 
   for callback <- @before_callbacks do
+    @doc false
     def unquote(callback)(%{__struct__: Ecto.Changeset, data: %schema{}} = changeset) do
       if function_exported?(schema, unquote(callback), 1) do
         schema.unquote(callback)(changeset)
@@ -253,6 +283,7 @@ defmodule EctoHooks do
   end
 
   for callback <- @after_callbacks do
+    @doc false
     def unquote(callback)(%schema{} = data) do
       if function_exported?(schema, unquote(callback), 1) do
         schema.unquote(callback)(data)
