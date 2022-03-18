@@ -59,9 +59,17 @@ defmodule EctoHooks do
 
   The hooking functionality provided by `EctoHooks` can be pretty useful for resolving
   virtual fields, but can also prove useful for centralising some logging or telemetry
-  logic. Note that because any business logic is executed synchronously after the
-  hooked `Ecto.Repo` callback, one should avoid doing any blocking or potentially
-  terminating logic within hooks as weird or strange behaviour may occur.
+  logic.
+
+  All defined hooks are executed synchronously immediately before or after calling into
+  your configured database. To prevent the potential for hooks to infinite loop before
+  returning, by default, EctoHooks will not trigger more than once within a single
+  Repo call. You can opt out of this via calling `EctoHooks.enable_hooks/0` in any
+  of your defined hooks.
+
+  This infinite loop protection only currently works within a given process. Take care
+  when a defined hook may spawn other processes which may trigger database updates which
+  themselves result in hooks being called.
 
   ## Example usage:
   ```elixir
@@ -123,6 +131,8 @@ defmodule EctoHooks do
         with {:ok, result} <- super(changeset, opts) do
           {:ok, @hooks.after_insert(result)}
         end
+      after
+        @hooks.enable_hooks()
       end
 
       def insert!(changeset, opts) do
@@ -130,6 +140,8 @@ defmodule EctoHooks do
         |> @hooks.before_insert
         |> super(opts)
         |> @hooks.after_insert
+      after
+        @hooks.enable_hooks()
       end
 
       def update(changeset, opts) do
@@ -138,6 +150,8 @@ defmodule EctoHooks do
         with {:ok, result} <- super(changeset, opts) do
           {:ok, @hooks.after_update(result)}
         end
+      after
+        @hooks.enable_hooks()
       end
 
       def update!(changeset, opts) do
@@ -145,48 +159,64 @@ defmodule EctoHooks do
         |> @hooks.before_update
         |> super(opts)
         |> @hooks.after_update
+      after
+        @hooks.enable_hooks()
       end
 
       def get(query, id, opts) do
         with %{__meta__: %Ecto.Schema.Metadata{}} = result <- super(query, id, opts) do
           @hooks.after_get(result)
         end
+      after
+        @hooks.enable_hooks()
       end
 
       def get!(query, id, opts) do
         query
         |> super(id, opts)
         |> @hooks.after_get
+      after
+        @hooks.enable_hooks()
       end
 
       def get_by(query, clauses, opts) do
         with %{__meta__: %Ecto.Schema.Metadata{}} = result <- super(query, clauses, opts) do
           @hooks.after_get(result)
         end
+      after
+        @hooks.enable_hooks()
       end
 
       def get_by!(query, clauses, opts) do
         query
         |> super(clauses, opts)
         |> @hooks.after_get
+      after
+        @hooks.enable_hooks()
       end
 
       def one(query, opts) do
         with %{__meta__: %Ecto.Schema.Metadata{}} = result <- super(query, opts) do
           @hooks.after_get(result)
         end
+      after
+        @hooks.enable_hooks()
       end
 
       def one!(query, opts) do
         query
         |> super(opts)
         |> @hooks.after_get
+      after
+        @hooks.enable_hooks()
       end
 
       def all(query, opts) do
         query
         |> super(opts)
         |> Enum.map(&@hooks.after_get/1)
+      after
+        @hooks.enable_hooks()
       end
 
       def delete(changeset_or_query, opts) do
@@ -195,6 +225,8 @@ defmodule EctoHooks do
         with {:ok, result} <- super(changeset_or_query, opts) do
           {:ok, @hooks.after_delete(result)}
         end
+      after
+        @hooks.enable_hooks()
       end
 
       def delete!(changeset_or_query, opts) do
@@ -202,6 +234,8 @@ defmodule EctoHooks do
         |> @hooks.before_delete
         |> super(opts)
         |> @hooks.after_delete
+      after
+        @hooks.enable_hooks()
       end
 
       def insert_or_update(
@@ -213,6 +247,8 @@ defmodule EctoHooks do
         with {:ok, result} <- super(changeset, opts) do
           {:ok, @hooks.after_update(result)}
         end
+      after
+        @hooks.enable_hooks()
       end
 
       def insert_or_update(
@@ -224,6 +260,8 @@ defmodule EctoHooks do
         with {:ok, result} <- super(changeset, opts) do
           {:ok, @hooks.after_insert(result)}
         end
+      after
+        @hooks.enable_hooks()
       end
 
       def insert_or_update(changeset, opts) do
@@ -238,6 +276,8 @@ defmodule EctoHooks do
         |> @hooks.before_update
         |> super(opts)
         |> @hooks.after_update
+      after
+        @hooks.enable_hooks()
       end
 
       def insert_or_update!(
@@ -248,6 +288,8 @@ defmodule EctoHooks do
         |> @hooks.before_insert
         |> super(opts)
         |> @hooks.after_insert
+      after
+        @hooks.enable_hooks()
       end
 
       def insert_or_update!(changeset, opts) do
@@ -256,13 +298,37 @@ defmodule EctoHooks do
     end
   end
 
+  @doc """
+  Disables EctoHooks from running for all future Repo operations in the current process.
+  """
+  def disable_hooks do
+    Process.put({__MODULE__, :hooks_enabled}, false)
+    :ok
+  end
+
+  @doc """
+  Enables EctoHooks from running for all future Repo operations in the current process.
+  """
+  def enable_hooks do
+    Process.put({__MODULE__, :hooks_enabled}, true)
+    :ok
+  end
+
+  @doc """
+  Returns a boolean indicating if EctoHooks are enabled in the current process.
+  """
+  def hooks_enabled? do
+    Process.get({__MODULE__, :hooks_enabled}, true)
+  end
+
   @before_callbacks [:before_delete, :before_insert, :before_update]
   @after_callbacks [:after_delete, :after_get, :after_insert, :after_update]
 
   for callback <- @before_callbacks do
     @doc false
     def unquote(callback)(%{__struct__: Ecto.Changeset, data: %schema{}} = changeset) do
-      if function_exported?(schema, unquote(callback), 1) do
+      if hooks_enabled?() && function_exported?(schema, unquote(callback), 1) do
+        disable_hooks()
         schema.unquote(callback)(changeset)
       else
         changeset
@@ -270,7 +336,8 @@ defmodule EctoHooks do
     end
 
     def unquote(callback)(%schema{} = data) do
-      if function_exported?(schema, unquote(callback), 1) do
+      if hooks_enabled?() && function_exported?(schema, unquote(callback), 1) do
+        disable_hooks()
         schema.unquote(callback)(data)
       else
         data
@@ -285,7 +352,8 @@ defmodule EctoHooks do
   for callback <- @after_callbacks do
     @doc false
     def unquote(callback)(%schema{} = data) do
-      if function_exported?(schema, unquote(callback), 1) do
+      if hooks_enabled?() && function_exported?(schema, unquote(callback), 1) do
+        disable_hooks()
         schema.unquote(callback)(data)
       else
         data

@@ -44,6 +44,28 @@ defmodule Ecto.Repo.HooksTest do
     end
   end
 
+  defmodule RecursiveCounter do
+    use Ecto.Schema
+    import Ecto.Changeset
+
+    require Logger
+
+    schema "counter" do
+      field(:count, :integer)
+    end
+
+    def after_insert(%__MODULE__{count: count} = data) do
+      data
+      |> changeset(%{count: count * 2})
+      |> Repo.update!()
+    end
+
+    def changeset(%__MODULE__{} = counter, attrs) do
+      counter
+      |> cast(attrs, [:count])
+    end
+  end
+
   defmodule AfterHooksUser do
     use Ecto.Schema
     import Ecto.Changeset
@@ -91,6 +113,65 @@ defmodule Ecto.Repo.HooksTest do
   setup do
     {:ok, _} = start_supervised(%{id: __MODULE__, start: {Repo, :start_link, []}})
     :ok
+  end
+
+  test "hooks only run once per Repo operation" do
+    assert {:ok, counter} =
+             %RecursiveCounter{}
+             |> RecursiveCounter.changeset(%{count: 1})
+             |> Repo.insert()
+
+    # See `Counter.after_insert/1`, but if it ran more than once, this number
+    # would be much larger
+    assert counter.count == 2
+  end
+
+  describe "disable_hooks/0" do
+    test "disables hooks after being called" do
+      assert EctoHooks.hooks_enabled?()
+      assert :ok = EctoHooks.disable_hooks()
+      refute EctoHooks.hooks_enabled?()
+    end
+
+    test "no-op if hooks already disabled" do
+      assert :ok = EctoHooks.disable_hooks()
+      refute EctoHooks.hooks_enabled?()
+      assert :ok = EctoHooks.disable_hooks()
+      refute EctoHooks.hooks_enabled?()
+    end
+  end
+
+  describe "enable_hooks/0" do
+    test "enables hooks after being called" do
+      assert :ok = EctoHooks.disable_hooks()
+      refute EctoHooks.hooks_enabled?()
+      assert :ok = EctoHooks.enable_hooks()
+      assert EctoHooks.hooks_enabled?()
+    end
+
+    test "no-op if hooks already enabled" do
+      assert EctoHooks.hooks_enabled?()
+      assert :ok = EctoHooks.enable_hooks()
+      assert EctoHooks.hooks_enabled?()
+    end
+  end
+
+  describe "hooks_enabled?/0" do
+    test "defaults to true" do
+      assert EctoHooks.hooks_enabled?()
+    end
+
+    test "returns false if `disable_hooks/0` was called" do
+      assert :ok = EctoHooks.disable_hooks()
+      refute EctoHooks.hooks_enabled?()
+    end
+
+    test "returns true if `enable_hooks/0` was called" do
+      assert :ok = EctoHooks.disable_hooks()
+      refute EctoHooks.hooks_enabled?()
+      assert :ok = EctoHooks.enable_hooks()
+      assert EctoHooks.hooks_enabled?()
+    end
   end
 
   describe "before_insert/1" do
