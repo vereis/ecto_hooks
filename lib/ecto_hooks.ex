@@ -369,7 +369,7 @@ defmodule EctoHooks do
       end
     end
 
-    def unquote(callback)(data) do
+    def unquote(callback)(data, _changeset_query_or_schema) do
       data
     end
   end
