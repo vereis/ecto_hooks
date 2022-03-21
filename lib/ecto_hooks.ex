@@ -103,8 +103,8 @@ defmodule EctoHooks do
       changeset
     end
 
-    def after_get(%__MODULE__{first_name: first_name, last_name: last_name} = user) do
-      %__MODULE__{user | full_name: first_name <> " " <> last_name}
+    def after_get(%__MODULE__{} = user, %EctoHooks.Delta{}) do
+      %__MODULE__{user | full_name: user.first_name <> " " <> user.last_name}
     end
   end
   ```
