@@ -54,7 +54,7 @@ defmodule Ecto.Repo.HooksTest do
       field(:count, :integer)
     end
 
-    def after_insert(%__MODULE__{count: count} = data) do
+    def after_insert(%__MODULE__{count: count} = data, _delta) do
       data
       |> changeset(%{count: count * 2})
       |> Repo.update!()
@@ -79,22 +79,22 @@ defmodule Ecto.Repo.HooksTest do
       field(:full_name, :string, virtual: true)
     end
 
-    def after_insert(%__MODULE__{first_name: first_name, last_name: last_name} = data) do
+    def after_insert(%__MODULE__{first_name: first_name, last_name: last_name} = data, _delta) do
       Logger.info("after insert")
       %__MODULE__{data | full_name: first_name <> " " <> last_name}
     end
 
-    def after_update(%__MODULE__{first_name: first_name, last_name: last_name} = data) do
+    def after_update(%__MODULE__{first_name: first_name, last_name: last_name} = data, _delta) do
       Logger.info("after update")
       %__MODULE__{data | full_name: first_name <> " " <> last_name}
     end
 
-    def after_get(%__MODULE__{first_name: first_name, last_name: last_name} = data) do
+    def after_get(%__MODULE__{first_name: first_name, last_name: last_name} = data, _delta) do
       Logger.info("after get")
       %__MODULE__{data | full_name: first_name <> " " <> last_name}
     end
 
-    def after_delete(%__MODULE__{first_name: first_name, last_name: last_name} = data) do
+    def after_delete(%__MODULE__{first_name: first_name, last_name: last_name} = data, _delta) do
       Logger.info("after delete")
       %__MODULE__{data | full_name: first_name <> " " <> last_name}
     end
@@ -103,6 +103,36 @@ defmodule Ecto.Repo.HooksTest do
       user
       |> cast(attrs, [:first_name, :last_name])
       |> validate_required([:first_name, :last_name])
+    end
+  end
+
+  defmodule DeltaCheck do
+    use Ecto.Schema
+    import Ecto.Changeset
+
+    schema "delta" do
+      field(:random_number, :integer)
+    end
+
+    def after_insert(%__MODULE__{} = data, delta) do
+      {data, delta}
+    end
+
+    def after_update(%__MODULE__{} = data, delta) do
+      {data, delta}
+    end
+
+    def after_delete(%__MODULE__{} = data, delta) do
+      {data, delta}
+    end
+
+    def after_get(%__MODULE__{} = data, delta) do
+      {data, delta}
+    end
+
+    def changeset(%__MODULE__{} = counter, attrs) do
+      counter
+      |> cast(attrs, [:random_number])
     end
   end
 
@@ -486,6 +516,15 @@ defmodule Ecto.Repo.HooksTest do
                  |> Repo.insert_or_update!()
       end
     end
+
+    test "changeset delta is passed into hook" do
+      random_number = System.monotonic_time()
+
+      assert {_, %Ecto.Changeset{changes: %{random_number: ^random_number}}} =
+               %DeltaCheck{random_number: 1234}
+               |> DeltaCheck.changeset(%{random_number: random_number})
+               |> Repo.insert!()
+    end
   end
 
   describe "after_update/1" do
@@ -588,6 +627,20 @@ defmodule Ecto.Repo.HooksTest do
                  |> AfterHooksUser.changeset(%{last_name: nil})
                  |> Repo.insert_or_update!()
       end
+    end
+
+    test "changeset delta is passed into hook" do
+      random_number = System.monotonic_time()
+
+      assert {data, _} =
+               %DeltaCheck{random_number: 1234}
+               |> DeltaCheck.changeset(%{})
+               |> Repo.insert!()
+
+      assert {_, %Ecto.Changeset{changes: %{random_number: ^random_number}}} =
+               data
+               |> DeltaCheck.changeset(%{random_number: random_number})
+               |> Repo.update!()
     end
   end
 
@@ -702,6 +755,16 @@ defmodule Ecto.Repo.HooksTest do
                assert [] = Repo.all(query)
              end) =~ "after get"
     end
+
+    test "query delta is passed into hook" do
+      assert {data, _} =
+               %DeltaCheck{random_number: 1234}
+               |> DeltaCheck.changeset(%{})
+               |> Repo.insert!()
+
+      query = from(x in DeltaCheck, limit: 192)
+      assert {_, ^query} = Repo.one!(query)
+    end
   end
 
   describe "after_delete/1" do
@@ -736,6 +799,15 @@ defmodule Ecto.Repo.HooksTest do
       assert_raise Ecto.NoPrimaryKeyValueError, fn ->
         assert Repo.delete!(%AfterHooksUser{})
       end
+    end
+
+    test "schema delta is passed into hook" do
+      assert {data, _} =
+               %DeltaCheck{random_number: 1234}
+               |> DeltaCheck.changeset(%{})
+               |> Repo.insert!()
+
+      assert {_, ^data} = Repo.delete!(data)
     end
   end
 end
