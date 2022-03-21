@@ -1,4 +1,6 @@
-defmodule Ecto.Repo.HooksTest do
+defmodule EctoHooksTest do
+  alias EctoHooks.Delta
+
   defmodule Repo do
     use EctoHooks.Repo,
       otp_app: :ecto_hooks,
@@ -520,7 +522,7 @@ defmodule Ecto.Repo.HooksTest do
     test "changeset delta is passed into hook" do
       random_number = System.monotonic_time()
 
-      assert {_, %Ecto.Changeset{changes: %{random_number: ^random_number}}} =
+      assert {_, %Delta{changeset: %{changes: %{random_number: ^random_number}}}} =
                %DeltaCheck{random_number: 1234}
                |> DeltaCheck.changeset(%{random_number: random_number})
                |> Repo.insert!()
@@ -637,7 +639,7 @@ defmodule Ecto.Repo.HooksTest do
                |> DeltaCheck.changeset(%{})
                |> Repo.insert!()
 
-      assert {_, %Ecto.Changeset{changes: %{random_number: ^random_number}}} =
+      assert {_, %Delta{changeset: %{changes: %{random_number: ^random_number}}}} =
                data
                |> DeltaCheck.changeset(%{random_number: random_number})
                |> Repo.update!()
@@ -763,7 +765,7 @@ defmodule Ecto.Repo.HooksTest do
                |> Repo.insert!()
 
       query = from(x in DeltaCheck, limit: 192)
-      assert {_, ^query} = Repo.one!(query)
+      assert {_, %Delta{queryable: ^query}} = Repo.one!(query)
     end
   end
 
@@ -807,7 +809,7 @@ defmodule Ecto.Repo.HooksTest do
                |> DeltaCheck.changeset(%{})
                |> Repo.insert!()
 
-      assert {_, ^data} = Repo.delete!(data)
+      assert {_, %Delta{record: ^data}} = Repo.delete!(data)
     end
   end
 end
