@@ -4,7 +4,7 @@ defmodule EctoHooks do
   `Ecto.Repo` callbacks to provide user definable hooks following successful
   execution.
 
-  Hooks to `MyApp.EctoSchema.after_get/1`:
+  Hooks to `MyApp.EctoSchema.after_get/2`:
   - `all/2`
   - `get/3`
   - `get!/3`
@@ -13,19 +13,19 @@ defmodule EctoHooks do
   - `one/2`
   - `one!/2`
 
-  Hooks to `MyApp.EctoSchema.after_delete/1`:
+  Hooks to `MyApp.EctoSchema.after_delete/2`:
   - `delete/2`
   - `delete!/2`
 
-  Hooks to `MyApp.EctoSchema.after_insert/1`:
+  Hooks to `MyApp.EctoSchema.after_insert/2`:
   - `insert/2`
   - `insert!/2`
 
-  Hooks to `MyApp.EctoSchema.after_update/1`:
+  Hooks to `MyApp.EctoSchema.after_update/2`:
   - `update/2`
   - `update!/2`
 
-  Hooks to `MyApp.EctoSchema.after_insert/1` or to `MyApp.Ecto.Schema.after_update/1`:
+  Hooks to `MyApp.EctoSchema.after_insert/2` or to `MyApp.Ecto.Schema.after_update/2`:
   - `insert_or_update/2`
   - `insert_or_update!/2`
 
@@ -49,6 +49,10 @@ defmodule EctoHooks do
   is what ultimately gets returned from the hook, and thus you should aim to write logic
   that is transparent and does not break the expected semantics or behaviour of said
   callback.
+
+  Also, all `after_*` hooks are provided with the changeset, query, or schema used for
+  insertion as a second parameter, which in some cases can be helpful for intuiting
+  the diff between the result before versus after running a repo operation.
 
   Any results wrapped within an `{:ok, _}` or `{:error, _}` are also returned re-wrapped
   as expected.
@@ -129,17 +133,18 @@ defmodule EctoHooks do
         changeset = @hooks.before_insert(changeset)
 
         with {:ok, result} <- super(changeset, opts) do
-          {:ok, @hooks.after_insert(result)}
+          {:ok, @hooks.after_insert(result, changeset)}
         end
       after
         @hooks.enable_hooks()
       end
 
       def insert!(changeset, opts) do
+        changeset = @hooks.before_insert(changeset)
+
         changeset
-        |> @hooks.before_insert
         |> super(opts)
-        |> @hooks.after_insert
+        |> @hooks.after_insert(changeset)
       after
         @hooks.enable_hooks()
       end
@@ -148,24 +153,25 @@ defmodule EctoHooks do
         changeset = @hooks.before_update(changeset)
 
         with {:ok, result} <- super(changeset, opts) do
-          {:ok, @hooks.after_update(result)}
+          {:ok, @hooks.after_update(result, changeset)}
         end
       after
         @hooks.enable_hooks()
       end
 
       def update!(changeset, opts) do
+        changeset = @hooks.before_update(changeset)
+
         changeset
-        |> @hooks.before_update
         |> super(opts)
-        |> @hooks.after_update
+        |> @hooks.after_update(changeset)
       after
         @hooks.enable_hooks()
       end
 
       def get(query, id, opts) do
         with %{__meta__: %Ecto.Schema.Metadata{}} = result <- super(query, id, opts) do
-          @hooks.after_get(result)
+          @hooks.after_get(result, query)
         end
       after
         @hooks.enable_hooks()
@@ -174,14 +180,14 @@ defmodule EctoHooks do
       def get!(query, id, opts) do
         query
         |> super(id, opts)
-        |> @hooks.after_get
+        |> @hooks.after_get(query)
       after
         @hooks.enable_hooks()
       end
 
       def get_by(query, clauses, opts) do
         with %{__meta__: %Ecto.Schema.Metadata{}} = result <- super(query, clauses, opts) do
-          @hooks.after_get(result)
+          @hooks.after_get(result, query)
         end
       after
         @hooks.enable_hooks()
@@ -190,14 +196,14 @@ defmodule EctoHooks do
       def get_by!(query, clauses, opts) do
         query
         |> super(clauses, opts)
-        |> @hooks.after_get
+        |> @hooks.after_get(query)
       after
         @hooks.enable_hooks()
       end
 
       def one(query, opts) do
         with %{__meta__: %Ecto.Schema.Metadata{}} = result <- super(query, opts) do
-          @hooks.after_get(result)
+          @hooks.after_get(result, query)
         end
       after
         @hooks.enable_hooks()
@@ -206,7 +212,7 @@ defmodule EctoHooks do
       def one!(query, opts) do
         query
         |> super(opts)
-        |> @hooks.after_get
+        |> @hooks.after_get(query)
       after
         @hooks.enable_hooks()
       end
@@ -214,7 +220,7 @@ defmodule EctoHooks do
       def all(query, opts) do
         query
         |> super(opts)
-        |> Enum.map(&@hooks.after_get/1)
+        |> Enum.map(&@hooks.after_get(&1, query))
       after
         @hooks.enable_hooks()
       end
@@ -223,17 +229,18 @@ defmodule EctoHooks do
         changeset_or_query = @hooks.before_delete(changeset_or_query)
 
         with {:ok, result} <- super(changeset_or_query, opts) do
-          {:ok, @hooks.after_delete(result)}
+          {:ok, @hooks.after_delete(result, changeset_or_query)}
         end
       after
         @hooks.enable_hooks()
       end
 
       def delete!(changeset_or_query, opts) do
+        changeset_or_query = @hooks.before_delete(changeset_or_query)
+
         changeset_or_query
-        |> @hooks.before_delete
         |> super(opts)
-        |> @hooks.after_delete
+        |> @hooks.after_delete(changeset_or_query)
       after
         @hooks.enable_hooks()
       end
@@ -245,7 +252,7 @@ defmodule EctoHooks do
         changeset = @hooks.before_update(changeset)
 
         with {:ok, result} <- super(changeset, opts) do
-          {:ok, @hooks.after_update(result)}
+          {:ok, @hooks.after_update(result, changeset)}
         end
       after
         @hooks.enable_hooks()
@@ -258,7 +265,7 @@ defmodule EctoHooks do
         changeset = @hooks.before_insert(changeset)
 
         with {:ok, result} <- super(changeset, opts) do
-          {:ok, @hooks.after_insert(result)}
+          {:ok, @hooks.after_insert(result, changeset)}
         end
       after
         @hooks.enable_hooks()
@@ -272,10 +279,11 @@ defmodule EctoHooks do
             %Ecto.Changeset{data: %{__meta__: %{state: :loaded}}} = changeset,
             opts
           ) do
+        changeset = @hooks.before_update(changeset)
+
         changeset
-        |> @hooks.before_update
         |> super(opts)
-        |> @hooks.after_update
+        |> @hooks.after_update(changeset)
       after
         @hooks.enable_hooks()
       end
@@ -284,10 +292,11 @@ defmodule EctoHooks do
             %Ecto.Changeset{data: %{__meta__: %{state: :built}}} = changeset,
             opts
           ) do
+        changeset = @hooks.before_insert(changeset)
+
         changeset
-        |> @hooks.before_insert
         |> super(opts)
-        |> @hooks.after_insert
+        |> @hooks.after_insert(changeset)
       after
         @hooks.enable_hooks()
       end
@@ -351,10 +360,10 @@ defmodule EctoHooks do
 
   for callback <- @after_callbacks do
     @doc false
-    def unquote(callback)(%schema{} = data) do
-      if hooks_enabled?() && function_exported?(schema, unquote(callback), 1) do
+    def unquote(callback)(%schema{} = data, changeset_query_or_schema) do
+      if hooks_enabled?() && function_exported?(schema, unquote(callback), 2) do
         disable_hooks()
-        schema.unquote(callback)(data)
+        schema.unquote(callback)(data, changeset_query_or_schema)
       else
         data
       end
