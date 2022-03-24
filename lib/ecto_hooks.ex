@@ -333,6 +333,24 @@ defmodule EctoHooks do
     Process.get({__MODULE__, :hooks_enabled}, true)
   end
 
+  @doc """
+  Utility function which returns true if currently executing inside the context of an
+  Ecto Hook.
+  """
+  def in_hook? do
+    Process.get({__MODULE__, :in_hook}, false)
+  end
+
+  defp set_in_hook do
+    Process.put({__MODULE__, :in_hook}, true)
+    :ok
+  end
+
+  defp clear_in_hook do
+    Process.put({__MODULE__, :in_hook}, false)
+    :ok
+  end
+
   @before_callbacks [:before_delete, :before_insert, :before_update]
   @after_callbacks [:after_delete, :after_get, :after_insert, :after_update]
 
@@ -342,21 +360,29 @@ defmodule EctoHooks do
           %{__struct__: Ecto.Changeset, data: %schema{}} = changeset,
           _caller_function
         ) do
+      :ok = set_in_hook()
+
       if hooks_enabled?() && function_exported?(schema, unquote(callback), 1) do
         disable_hooks()
         schema.unquote(callback)(changeset)
       else
         changeset
       end
+    after
+      :ok = clear_in_hook()
     end
 
     def unquote(callback)(%schema{} = data, _caller_function) do
+      :ok = set_in_hook()
+
       if hooks_enabled?() && function_exported?(schema, unquote(callback), 1) do
         disable_hooks()
         schema.unquote(callback)(data)
       else
         data
       end
+    after
+      :ok = clear_in_hook()
     end
 
     def unquote(callback)(changeset, _caller_function) do
@@ -367,6 +393,8 @@ defmodule EctoHooks do
   for callback <- @after_callbacks do
     @doc false
     def unquote(callback)(%schema{} = data, changeset_query_or_schema, caller_function) do
+      :ok = set_in_hook()
+
       if hooks_enabled?() && function_exported?(schema, unquote(callback), 2) do
         disable_hooks()
 
@@ -377,6 +405,8 @@ defmodule EctoHooks do
       else
         data
       end
+    after
+      :ok = clear_in_hook()
     end
 
     def unquote(callback)(data, _changeset_query_or_schema, _caller_function) do
