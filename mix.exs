@@ -7,7 +7,7 @@ defmodule EctoHooks.MixProject do
       app: :ecto_hooks,
       version: "1.0.1",
       elixir: "~> 1.10",
-      elixirrc_options: [warnings_as_errors: true],
+      elixirc_options: [warnings_as_errors: true],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       dialyzer: [
