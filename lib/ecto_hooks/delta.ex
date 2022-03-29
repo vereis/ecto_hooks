@@ -1,25 +1,26 @@
 defmodule EctoHooks.Delta do
   @moduledoc """
-  Struct which is given as the 2nd argument to any `after_*` hook defined by EctoHooks.
+  Defines the struct which is given as the 2nd argument to any `after_*` hooks.
 
-  Contains metadata about the hook such as the particular Repo call which resulted in
-  the hook being triggered, which hook was triggered, the source changeset, queryable,
-  or struct which was passed into said Repo call.
+  Contains metadata which may be useful for introspecting or otherwise conditionally
+  running hooks only when certain conditions are met.
 
-  This can be particularly helpful for conditionally disabling or enabling hooks on
-  a subset of triggers -- i.e. only when certain fields have changed in a given schema.
+  The following information is present in an `EctoHooks.Delta`:
 
-  In future, it might be possible for users to mark annotate certain Repo operations
-  to trigger hooks only for those annotated functions. This is the mechanism by which
-  that would work.
+  - The `Ecto.Repo` callback that triggered the hook
+  - The name of the current hook (useful if delegating to private functions in your schema)
+  - The `Ecto.Queryable` passed into the triggering `Ecto.Repo` callback if any
+  - The `Ecto.Changeset` passed into the triggering `Ecto.Repo` callback if any
   """
 
   alias __MODULE__
 
-  @enforce_keys [:operation, :hook, :source]
-  defstruct [:operation, :hook, :source, :queryable, :changeset, :record]
+  @type t :: %__MODULE__{}
 
-  @operations [
+  @enforce_keys [:repo_callback, :hook, :source]
+  defstruct [:repo_callback, :hook, :source, :queryable, :changeset, :record]
+
+  @repo_callbacks [
     :all,
     :delete,
     :delete!,
@@ -47,8 +48,13 @@ defmodule EctoHooks.Delta do
     :after_update
   ]
 
-  def new!(operation, hook, source) when operation in @operations and hook in @hooks do
-    delta = %Delta{operation: operation, hook: hook, source: source}
+  @type repo_callback :: unquote(Enum.reduce(@repo_callbacks, &{:|, [], [&1, &2]}))
+  @type hook :: unquote(Enum.reduce(@hooks, &{:|, [], [&1, &2]}))
+
+  @spec new!(repo_callback(), hook(), source :: any()) :: __MODULE__.t() | no_return()
+  def new!(repo_callback, hook, source)
+      when repo_callback in @repo_callbacks and hook in @hooks do
+    delta = %Delta{repo_callback: repo_callback, hook: hook, source: source}
 
     cond do
       match?(%{__struct__: Ecto.Changeset}, source) ->
@@ -66,5 +72,15 @@ defmodule EctoHooks.Delta do
       true ->
         delta
     end
+  end
+
+  @doc false
+  def repo_callbacks do
+    @repo_callbacks
+  end
+
+  @doc false
+  def hooks do
+    @hooks
   end
 end
