@@ -54,6 +54,9 @@ defmodule EctoHooks.Delta do
   @type hook :: unquote(Enum.reduce(@hooks, &{:|, [], [&1, &2]}))
 
   @spec new!(repo_callback(), hook(), source :: any()) :: __MODULE__.t() | no_return()
+  # Disabling credo is gross; but I find a `cond` is much more readable than
+  # refactoring this into multiple function heads. Forgive me!
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   def new!(repo_callback, hook, source)
       when repo_callback in @repo_callbacks and hook in @hooks do
     delta = %Delta{repo_callback: repo_callback, hook: hook, source: source}
