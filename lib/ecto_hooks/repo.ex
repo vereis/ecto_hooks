@@ -56,6 +56,8 @@ defmodule EctoHooks.Repo do
   - `get_by!/3`
   - `one/2`
   - `one!/2`
+  - `reload/2`
+  - `reload!/2`
 
   Executes `after_delete/2` if defined in schema:
   - `delete/2`
@@ -249,6 +251,30 @@ defmodule EctoHooks.Repo do
         query
         |> super(opts)
         |> Enum.map(&EctoHooks.after_get(&1, :all, query))
+      end
+
+      def reload(struct_or_structs, opts) do
+        struct_or_structs
+        |> super(opts)
+        |> case do
+          structs when is_list(structs) ->
+            Enum.map(structs, &EctoHooks.after_get(&1, :reload, struct_or_structs))
+
+          struct ->
+            EctoHooks.after_get(struct, :reload, struct_or_structs)
+        end
+      end
+
+      def reload!(struct_or_structs, opts) do
+        struct_or_structs
+        |> super(opts)
+        |> case do
+          structs when is_list(structs) ->
+            Enum.map(structs, &EctoHooks.after_get(&1, :reload!, struct_or_structs))
+
+          struct ->
+            EctoHooks.after_get(struct, :reload!, struct_or_structs)
+        end
       end
 
       def delete(changeset_or_query, opts) do
