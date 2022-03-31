@@ -160,20 +160,22 @@ defmodule EctoHooks.Repo do
     # credo:disable-for-next-line Credo.Check.Refactor.LongQuoteBlocks
     quote do
       defoverridable all: 2,
-                     delete: 2,
                      delete!: 2,
-                     get: 3,
+                     delete: 2,
                      get!: 3,
-                     get_by: 3,
+                     get: 3,
                      get_by!: 3,
-                     insert: 2,
+                     get_by: 3,
                      insert!: 2,
-                     insert_or_update: 2,
+                     insert: 2,
                      insert_or_update!: 2,
-                     one: 2,
+                     insert_or_update: 2,
                      one!: 2,
-                     update: 2,
-                     update!: 2
+                     one: 2,
+                     reload!: 2,
+                     reload: 2,
+                     update!: 2,
+                     update: 2
 
       def insert(changeset, opts) do
         changeset = EctoHooks.before_insert(changeset, :insert)
