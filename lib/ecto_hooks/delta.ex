@@ -71,6 +71,9 @@ defmodule EctoHooks.Delta do
       is_struct(source) && function_exported?(source.__struct__, :__schema__, 2) ->
         %Delta{delta | record: source}
 
+      is_list(source) ->
+        %Delta{delta | record: source}
+
       true ->
         delta
     end
