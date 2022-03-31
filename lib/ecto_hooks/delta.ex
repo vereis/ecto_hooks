@@ -22,30 +22,32 @@ defmodule EctoHooks.Delta do
 
   @repo_callbacks [
     :all,
-    :delete,
     :delete!,
-    :get,
+    :delete,
     :get!,
-    :get_by,
+    :get,
     :get_by!,
-    :insert,
+    :get_by,
     :insert!,
-    :insert_or_update,
+    :insert,
     :insert_or_update!,
-    :one,
+    :insert_or_update,
     :one!,
-    :update,
-    :update!
+    :one,
+    :reload!,
+    :reload,
+    :update!,
+    :update
   ]
 
   @hooks [
-    :before_delete,
-    :before_insert,
-    :before_update,
     :after_delete,
     :after_get,
     :after_insert,
-    :after_update
+    :after_update,
+    :before_delete,
+    :before_insert,
+    :before_update
   ]
 
   @type repo_callback :: unquote(Enum.reduce(@repo_callbacks, &{:|, [], [&1, &2]}))
