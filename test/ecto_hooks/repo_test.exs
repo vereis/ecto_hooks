@@ -240,6 +240,36 @@ defmodule EctoHooks.RepoTest do
       {:ok, user: user}
     end
 
+    for repo_callback <- [:reload, :reload!] do
+      singular_test_name = "executes after successful Repo.#{repo_callback}/1 given struct"
+      plural_test_name = "executes after successful Repo.#{repo_callback}/1 given list"
+
+      test singular_test_name, ctx do
+        put_hook(:after_get, fn %User{full_name: nil} = user, %Delta{} = delta ->
+          assert delta.hook == :after_get
+          assert delta.repo_callback == unquote(repo_callback)
+          assert delta.source == delta.record
+          %{user | full_name: user.first_name <> " " <> user.last_name}
+        end)
+
+        response = Repo.unquote(repo_callback)(ctx.user)
+        assert %User{full_name: "Bob Dylan"} = unwrap(response)
+      end
+
+      test plural_test_name, ctx do
+        put_hook(:after_get, fn %User{full_name: nil} = user, %Delta{} = delta ->
+          assert delta.hook == :after_get
+          assert delta.repo_callback == unquote(repo_callback)
+          assert delta.source == delta.record
+
+          %{user | full_name: user.first_name <> " " <> user.last_name}
+        end)
+
+        [response] = Repo.unquote(repo_callback)([ctx.user])
+        assert %User{full_name: "Bob Dylan"} = unwrap(response)
+      end
+    end
+
     for repo_callback <- [:all, :one, :one!] do
       test_name = "executes after successful Repo.#{repo_callback}/1"
 
