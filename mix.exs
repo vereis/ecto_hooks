@@ -5,7 +5,7 @@ defmodule EctoHooks.MixProject do
     [
       aliases: aliases(),
       app: :ecto_hooks,
-      version: "1.0.1",
+      version: "1.0.3",
       elixir: "~> 1.10",
       elixirc_options: [warnings_as_errors: true],
       start_permanent: Mix.env() == :prod,
