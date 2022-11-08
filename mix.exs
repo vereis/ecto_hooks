@@ -34,7 +34,7 @@ defmodule EctoHooks.MixProject do
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
 
       # Test dependencies
-      {:etso, "~> 0.1.2", only: :test},
+      {:etso, "~> 1.1.0", only: :test},
 
       # Misc dependencies
       {:ex_doc, "~> 0.14", only: :dev, runtime: false}

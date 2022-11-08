@@ -58,6 +58,7 @@ defmodule EctoHooks.Repo do
   - `one!/2`
   - `reload/2`
   - `reload!/2`
+  - `preload/3`
 
   Executes `after_delete/2` if defined in schema:
   - `delete/2`
@@ -176,6 +177,7 @@ defmodule EctoHooks.Repo do
                      one: 2,
                      reload!: 2,
                      reload: 2,
+                     preload: 3,
                      update!: 2,
                      update: 2
 
@@ -276,6 +278,56 @@ defmodule EctoHooks.Repo do
             EctoHooks.after_get(struct, :reload!, struct_or_structs)
         end
       end
+
+      def preload(struct_or_structs, preload, opts) when is_atom(preload),
+        do: preload(struct_or_structs, [preload], opts)
+
+      def preload(struct_or_structs, preloads, opts) do
+        struct_or_structs
+        |> super(preloads, opts)
+        |> complete_preloads(preloads)
+      end
+
+      defp complete_preloads(structs, preloads) when is_list(structs) do
+        Enum.map(structs, fn struct ->
+          complete_preloads(struct, preloads)
+        end)
+      end
+
+      defp complete_preloads(struct, preloads) do
+        struct
+        |> traverse_preloads(preloads)
+        |> EctoHooks.after_get(:preload, struct)
+      end
+
+      defp traverse_preloads(nil, _preloads), do: nil
+
+      defp traverse_preloads(struct, preloads) when is_list(preloads) do
+        Enum.reduce(preloads, struct, fn preload, acc ->
+          traverse_preloads(acc, preload)
+        end)
+      end
+
+      defp traverse_preloads(struct, {preload, nested_preloads}) do
+        {_, updated_struct} =
+          Map.get_and_update(struct, preload, fn v ->
+            {v, complete_preloads(v, nested_preloads)}
+          end)
+
+        updated_struct
+      end
+
+      defp traverse_preloads(struct, preload) when is_atom(preload) do
+        {_, updated_struct} =
+          Map.get_and_update(struct, preload, fn v ->
+            {v, complete_preloads(v, [])}
+          end)
+
+        updated_struct
+      end
+
+      # in case the preload is a query ignore it
+      defp traverse_preloads(struct, _preload), do: struct
 
       def delete(changeset_or_query, opts) do
         changeset_or_query = EctoHooks.before_delete(changeset_or_query, :delete)

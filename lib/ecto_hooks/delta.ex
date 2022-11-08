@@ -36,6 +36,7 @@ defmodule EctoHooks.Delta do
     :one,
     :reload!,
     :reload,
+    :preload,
     :update!,
     :update
   ]
