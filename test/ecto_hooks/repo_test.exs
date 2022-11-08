@@ -50,15 +50,54 @@ defmodule EctoHooks.RepoTest do
       adapter: Etso.Adapter
   end
 
+  defmodule UserTeam do
+    use Ecto.Schema
+    import Ecto.Changeset
+    import Ecto.Query, warn: false
+
+    schema "user_team" do
+      belongs_to(:user, EctoHooks.RepoTest.User)
+      belongs_to(:team, EctoHooks.RepoTest.Team)
+    end
+
+    def changeset(%__MODULE__{} = user_team, attrs) do
+      user_team
+      |> cast(attrs, [:user_id, :team_id])
+      |> validate_required([:user_id, :team_id])
+    end
+  end
+
+  defmodule Team do
+    use Ecto.Schema
+    import Ecto.Changeset
+    import Ecto.Query, warn: false
+
+    schema "team" do
+      field(:name, :string)
+      belongs_to(:owner, EctoHooks.RepoTest.User)
+      has_many(:users_teams, EctoHooks.RepoTest.UserTeam)
+      has_many(:users, through: [:users_teams, :user])
+    end
+
+    def changeset(%__MODULE__{} = team, attrs) do
+      team
+      |> cast(attrs, [:name, :owner_id])
+      |> validate_required([:name, :owner_id])
+    end
+  end
+
   defmodule User do
     use Ecto.Schema
     import Ecto.Changeset
+    import Ecto.Query, warn: false
 
     schema "user" do
       field(:first_name, :string)
       field(:last_name, :string)
 
       field(:full_name, :string, virtual: true)
+      has_many(:users_teams, EctoHooks.RepoTest.Team)
+      has_many(:teams, through: [:users_teams, :team])
     end
 
     def before_insert(%Ecto.Changeset{} = changeset),
@@ -127,7 +166,7 @@ defmodule EctoHooks.RepoTest do
           _e ->
             :noop
         after
-          assert_received(expected_message)
+          assert_received(^expected_message)
         end
       end
     end
@@ -175,7 +214,7 @@ defmodule EctoHooks.RepoTest do
           _e ->
             :noop
         after
-          assert_received(expected_message)
+          assert_received(^expected_message)
         end
       end
     end
@@ -208,7 +247,7 @@ defmodule EctoHooks.RepoTest do
                  |> Repo.unquote(repo_callback)
                  |> unwrap()
 
-        assert_received(expected_message)
+        assert_received(^expected_message)
       end
 
       test bad_test_name do
@@ -225,7 +264,7 @@ defmodule EctoHooks.RepoTest do
           |> unwrap()
         end
 
-        assert_received(expected_message)
+        assert_received(^expected_message)
       end
     end
   end
@@ -346,6 +385,219 @@ defmodule EctoHooks.RepoTest do
         e in Ecto.NoResultsError ->
           unless is_bang?(unquote(repo_callback)), do: reraise(e, __STACKTRACE__)
       end
+    end
+  end
+
+  describe "after_get/2 preload cases" do
+    setup do
+      user =
+        %User{}
+        |> User.changeset(%{first_name: "Bob", last_name: "Dylan"})
+        |> Repo.insert!()
+
+      team =
+        %Team{}
+        |> Team.changeset(%{name: "#{user.first_name}'s team", owner_id: user.id})
+        |> Repo.insert!()
+
+      _user_team =
+        %UserTeam{}
+        |> UserTeam.changeset(%{user_id: user.id, team_id: team.id})
+        |> Repo.insert!()
+
+      {:ok, user: user, team: team}
+    end
+
+    repo_callback = :preload
+    singular_test_name = "executes after successful Repo.#{repo_callback}/3 on struct with"
+    plural_test_name = "executes after successful Repo.#{repo_callback}/3 on list with"
+
+    test "#{singular_test_name} nil" do
+      put_hook(:after_get, fn %User{full_name: nil} = user, %Delta{} = delta ->
+        assert delta.hook == :after_get
+        assert delta.repo_callback == unquote(repo_callback)
+        assert delta.source == delta.record
+
+        %{user | full_name: user.first_name <> " " <> user.last_name}
+      end)
+
+      response = Repo.unquote(repo_callback)(nil, :owner)
+      assert is_nil(unwrap(response))
+    end
+
+    test "#{singular_test_name} single preload", ctx do
+      put_hook(:after_get, fn %User{full_name: nil} = user, %Delta{} = delta ->
+        assert delta.hook == :after_get
+        assert delta.repo_callback == unquote(repo_callback)
+        assert delta.source == delta.record
+        %{user | full_name: user.first_name <> " " <> user.last_name}
+      end)
+
+      response = Repo.unquote(repo_callback)(ctx.team, :owner)
+      assert %User{full_name: "Bob Dylan"} = unwrap(response).owner
+    end
+
+    test "#{plural_test_name} single preload", ctx do
+      put_hook(:after_get, fn %User{full_name: nil} = user, %Delta{} = delta ->
+        assert delta.hook == :after_get
+        assert delta.repo_callback == unquote(repo_callback)
+        assert delta.source == delta.record
+
+        %{user | full_name: user.first_name <> " " <> user.last_name}
+      end)
+
+      [response] = Repo.unquote(repo_callback)([ctx.team], [:owner])
+      assert %User{full_name: "Bob Dylan"} = unwrap(response).owner
+    end
+
+    test "#{singular_test_name} multiple singular preloads", ctx do
+      put_hook(:after_get, fn %User{full_name: nil} = user, %Delta{} = delta ->
+        assert delta.hook == :after_get
+        assert delta.repo_callback == unquote(repo_callback)
+        assert delta.source == delta.record
+
+        %{user | full_name: user.first_name <> " " <> user.last_name}
+      end)
+
+      response = Repo.unquote(repo_callback)(ctx.team, [:owner, :users])
+      assert %User{full_name: "Bob Dylan"} = unwrap(response).owner
+
+      assert Enum.all?(unwrap(response).users, fn user ->
+               %User{full_name: "Bob Dylan"} = user
+             end)
+    end
+
+    test "#{plural_test_name} multiple singular preloads", ctx do
+      put_hook(:after_get, fn %User{full_name: nil} = user, %Delta{} = delta ->
+        assert delta.hook == :after_get
+        assert delta.repo_callback == unquote(repo_callback)
+        assert delta.source == delta.record
+
+        %{user | full_name: user.first_name <> " " <> user.last_name}
+      end)
+
+      [response] = Repo.unquote(repo_callback)([ctx.team], [:owner, :users])
+      assert %User{full_name: "Bob Dylan"} = unwrap(response).owner
+
+      assert Enum.all?(unwrap(response).users, fn user ->
+               %User{full_name: "Bob Dylan"} = user
+             end)
+    end
+
+    test "#{singular_test_name} mixed atom and query preloads", ctx do
+      require Ecto.Query
+
+      put_hook(:after_get, fn %User{full_name: nil} = user, %Delta{} = delta ->
+        assert delta.hook == :after_get
+        assert delta.repo_callback == unquote(repo_callback)
+        assert delta.source == delta.record
+
+        %{user | full_name: user.first_name <> " " <> user.last_name}
+      end)
+
+      response =
+        Repo.unquote(repo_callback)(
+          ctx.team,
+          [
+            :users,
+            owner: Ecto.Query.from(u in EctoHooks.RepoTest.User),
+            users_teams: Ecto.Query.from(ut in EctoHooks.RepoTest.UserTeam)
+          ]
+        )
+
+      assert %User{full_name: "Bob Dylan"} = unwrap(response).owner
+
+      # when relation is explicitly preloaded the hook is reached
+      assert Enum.all?(unwrap(response).users, fn user -> %User{full_name: "Bob Dylan"} = user end)
+
+      # when relation is NOT explicitly preloaded the hook is NOT reached
+      assert Enum.all?(unwrap(response).users_teams, fn ut ->
+               %User{full_name: nil} = ut.user
+             end)
+    end
+
+    test "#{plural_test_name} mixed atom and query preloads", ctx do
+      require Ecto.Query
+
+      put_hook(:after_get, fn %User{full_name: nil} = user, %Delta{} = delta ->
+        assert delta.hook == :after_get
+        assert delta.repo_callback == unquote(repo_callback)
+        assert delta.source == delta.record
+
+        %{user | full_name: user.first_name <> " " <> user.last_name}
+      end)
+
+      [response] =
+        Repo.unquote(repo_callback)(
+          [ctx.team],
+          [
+            :users,
+            owner: Ecto.Query.from(u in EctoHooks.RepoTest.User),
+            users_teams: Ecto.Query.from(ut in EctoHooks.RepoTest.UserTeam)
+          ]
+        )
+
+      assert %User{full_name: "Bob Dylan"} = unwrap(response).owner
+
+      # when relation is explicitly preloaded the hook is reached
+      assert Enum.all?(unwrap(response).users, fn user -> %User{full_name: "Bob Dylan"} = user end)
+
+      # when relation is NOT explicitly preloaded the hook is NOT reached
+      assert Enum.all?(unwrap(response).users_teams, fn ut ->
+               %User{full_name: nil} = ut.user
+             end)
+    end
+
+    test "#{singular_test_name} explicit nested preloads", ctx do
+      require Ecto.Query
+
+      put_hook(:after_get, fn %User{full_name: nil} = user, %Delta{} = delta ->
+        assert delta.hook == :after_get
+        assert delta.repo_callback == unquote(repo_callback)
+        assert delta.source == delta.record
+
+        %{user | full_name: user.first_name <> " " <> user.last_name}
+      end)
+
+      response =
+        Repo.unquote(repo_callback)(
+          ctx.team,
+          users_teams: [:user, team: [:owner]]
+        )
+
+      assert Enum.all?(unwrap(response).users_teams, fn ut ->
+               %User{full_name: "Bob Dylan"} = ut.user
+             end)
+
+      assert Enum.all?(unwrap(response).users_teams, fn ut ->
+               %User{full_name: "Bob Dylan"} = ut.team.owner
+             end)
+    end
+
+    test "#{plural_test_name} explicit nested preloads", ctx do
+      require Ecto.Query
+
+      put_hook(:after_get, fn %User{full_name: nil} = user, %Delta{} = delta ->
+        assert delta.hook == :after_get
+        assert delta.repo_callback == unquote(repo_callback)
+        assert delta.source == delta.record
+
+        %{user | full_name: user.first_name <> " " <> user.last_name}
+      end)
+
+      [response] =
+        Repo.unquote(repo_callback)(
+          [ctx.team],
+          users_teams: [:user, team: [:owner]]
+        )
+
+      assert Enum.all?(unwrap(response).users_teams, fn ut ->
+               %User{full_name: "Bob Dylan"} = ut.user
+             end)
+
+      assert Enum.all?(unwrap(response).users_teams, fn ut ->
+               %User{full_name: "Bob Dylan"} = ut.team.owner
+             end)
     end
   end
 
