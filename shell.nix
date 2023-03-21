@@ -3,6 +3,6 @@ let
 in
 pkgs.mkShell {
   buildInputs = [
-    pkgs.elixir_1_10
+    pkgs.elixir_1_13
   ];
 }
