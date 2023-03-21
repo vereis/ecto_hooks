@@ -30,7 +30,7 @@ defmodule EctoHooks.MixProject do
   defp deps do
     [
       # Lint dependencies
-      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
 
       # Test dependencies
