@@ -43,4 +43,4 @@ jobs:
       # Execute linting / test tasks
       # ===================================================================================
       - run: nix-shell --run "mix lint"
-      - run: nix-shell --run "mix test --cover --trace --slowest 10"
+      - run: nix-shell --run "mix test --trace --slowest 10"
