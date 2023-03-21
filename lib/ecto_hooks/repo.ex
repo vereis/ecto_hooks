@@ -138,8 +138,8 @@ defmodule EctoHooks.Repo do
   loops provided.
 
   If you wish to opt in, opt out, or introspect the state of these mitigations, please
-  see the documentation for the following functions: `EctoHooks.enable_hooks/0`,
-  `EctoHooks.disable_hooks/0`, `EctoHooks.hooks_enabled?/0` and `EctoHooks.in_hook?/0`.
+  see the documentation for the following functions: `EctoHooks.enable_hooks/1`,
+  `EctoHooks.disable_hooks/1`, `EctoHooks.hooks_enabled?/0` and `EctoHooks.in_hook?/0`.
 
   This is a very powerful tool, and admittedly quite hidden and hard to track down.
   Trying to avoid adding too much business logic in your EctoHooks is wise for both
