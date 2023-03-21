@@ -62,24 +62,24 @@ defmodule EctoHooks do
   end
 
   @doc """
-  Enables the next `before_*` or `after_*` hook to execute from within the context of
-  an already running hook.
+  Ensures EctoHooks run for all future Repo operations in the current process.
 
-  As a mitigation for infinitely looping hooks caused by hooks triggering other hooks,
-  hooks will not run while inside the stacktrace of another hook.
-
-  Calling this function opts out of this mitigation for the next hook being executed.
+  Internally, we use it to scope re-enabling hooks per execution, as we disabled
+  them as a mitigation for infinitely looping hooks caused by hooks triggering
+  other hooks. This happens when provided `[global: false]`, which should only be
+  done internally.
   """
-  @spec enable_hooks() :: :ok
-  defdelegate enable_hooks, to: State
+  @spec enable_hooks(Keyword.t()) :: :ok
+  defdelegate enable_hooks(opts \\ [global: true]), to: State
 
   @doc """
-  Disables the next `before_*` or `after_*` hook from executing. 
+  Disables EctoHooks running for all future Repo operations in the current process.
 
-  This is automatically cleared after triggering any `Ecto.Repo` callback.
+  Internally, this is called with the options `[global: false]` which gets
+  automatically cleared after triggering any `Ecto.Repo` callback.
   """
-  @spec disable_hooks() :: :ok
-  defdelegate disable_hooks, to: State
+  @spec disable_hooks(Keyword.t()) :: :ok
+  defdelegate disable_hooks(opts \\ [global: true]), to: State
 
   @doc """
   Returns a boolean indicating if any `before_*` or `after_*` hooks are allowed
@@ -104,7 +104,7 @@ defmodule EctoHooks do
   By default, every hook will "acquire" an EctoHook context and increment a ref count.
   These ref counts are automatically decremented once a hook finishes running.
 
-  This is provided as a lower level alternative the `enable_hooks/0`, `disable_hooks/0`,
+  This is provided as a lower level alternative the `enable_hooks/1`, `disable_hooks/1`,
   and `hooks_enabled?/0` functions.
   """
   @spec hooks_ref_count() :: pos_integer()
@@ -137,7 +137,7 @@ defmodule EctoHooks do
 
   defp execute_hook(schema, hook, param_1, param_2) do
     if State.hooks_enabled?() do
-      :ok = State.disable_hooks()
+      :ok = State.disable_hooks(global: false)
       :ok = State.acquire_hook()
 
       apply(schema, hook, [param_1 | (param_2 && [param_2]) || []])
@@ -148,7 +148,7 @@ defmodule EctoHooks do
     _e in [UndefinedFunctionError, FunctionClauseError] ->
       param_1
   after
-    :ok = State.enable_hooks()
+    :ok = State.enable_hooks(global: false)
     :ok = State.release_hook()
   end
 end
