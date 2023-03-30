@@ -145,7 +145,7 @@ defmodule EctoHooks do
       param_1
     end
   rescue
-    _e in [UndefinedFunctionError, FunctionClauseError] ->
+    %struct{function: ^hook} when struct in [UndefinedFunctionError, FunctionClauseError] ->
       param_1
   after
     :ok = State.enable_hooks(global: false)
