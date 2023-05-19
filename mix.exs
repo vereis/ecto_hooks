@@ -11,7 +11,13 @@ defmodule EctoHooks.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       dialyzer: [plt_file: {:no_warn, "priv/plts/dialyzer.plt"}],
-      preferred_cli_env: [test: :test, "test.watch": :test],
+      preferred_cli_env: [
+        test: :test,
+        "test.watch": :test,
+        coveralls: :test,
+        "coveralls.html": :test
+      ],
+      test_coverage: [tool: ExCoveralls],
       package: package(),
       description: description(),
       source_url: "https://github.com/vereis/ecto_hooks"
@@ -35,6 +41,7 @@ defmodule EctoHooks.MixProject do
       # Test dependencies
       {:etso, "~> 1.1.0", only: :test},
       {:mix_test_watch, "~> 1.1", only: :test, runtime: false},
+      {:excoveralls, "~> 0.16", only: :test, runtime: false},
 
       # Misc dependencies
       {:ex_doc, "~> 0.14", only: :dev, runtime: false}
