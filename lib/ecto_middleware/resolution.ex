@@ -39,6 +39,15 @@ defmodule EctoMiddleware.Resolution do
     end
   end
 
+  @doc """
+  Executes all of the configured "before" middleware for the given resolution.
+
+  This function is intended to be used by the `EctoMiddleware` module, but can also be
+  used directly if you need to execute the "before" middleware for testing purposes.
+
+  Provide a `resolution` struct as the argument with `action`, `args`, and `entity` fields,
+  alongside the `repo` module that the middleware is being executed for.
+  """
   @spec execute_before!(t()) :: t()
   def execute_before!(%__MODULE__{} = resolution) do
     resolution = %__MODULE__{resolution | before_input: List.first(resolution.args)}
@@ -51,6 +60,16 @@ defmodule EctoMiddleware.Resolution do
     %__MODULE__{resolution | before_output: before_output}
   end
 
+  @doc """
+  Executes all of the configured "after" middleware for the given resolution.
+
+  This function is intended to be used by the `EctoMiddleware` module, but can also be
+  used directly if you need to execute the "after" middleware for testing purposes.
+
+  Provide a `resolution` struct as the argument with `action`, `args`, and `entity` fields,
+  alongside the `repo` module that the middleware is being executed for, alongside the
+  expected return value of the given `Ecto.Repo` callback.
+  """
   @spec execute_after!(t(), input :: term()) :: t()
   def execute_after!(%__MODULE__{} = resolution, input) do
     resolution = %__MODULE__{resolution | after_input: input}
