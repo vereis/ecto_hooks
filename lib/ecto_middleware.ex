@@ -73,6 +73,7 @@ defmodule EctoMiddleware do
 
       import EctoMiddleware
       require EctoMiddleware.Resolution, as: Resolution
+      require EctoMiddleware
       alias __MODULE__, as: Self
 
       @spec middleware(action(), resource()) :: [middleware()]
@@ -98,199 +99,96 @@ defmodule EctoMiddleware do
                      update!: 2,
                      update: 2
 
-      def insert(changeset, opts) do
-        resolution = Resolution.new!([changeset, opts])
-        resolution = Resolution.execute_before!(resolution)
+      stub_optimistic_functions!()
+      stub_ok_error_functions!()
+      stub_bang_functions!()
+    end
+  end
 
-        case super(resolution.before_output, opts) do
-          {:ok, result} ->
-            {:ok, Resolution.execute_after!(resolution, result).after_output}
+  # Automatically execute before and after middleware for the given functions.
+  # These functions return either a list, an ecto schema struct, or arbitary values.
+  # For lists and ecto schemas, ensure the before and after middlewares are executed.
+  defmacro stub_optimistic_functions! do
+    import Macro
+    c = __MODULE__
 
-          {:error, reason} ->
-            {:error, reason}
+    arity_2 = [:one, :all, :reload, :reload!]
+    arity_3 = [:preload, :get_by, :get]
+
+    for {fun, arity} <- Enum.map(arity_2, &{&1, 2}) ++ Enum.map(arity_3, &{&1, 3}) do
+      quote do
+        def unquote(fun)(unquote_splicing(generate_arguments(arity, c))) do
+          resolution = Resolution.new!([unquote_splicing(generate_arguments(arity, c))])
+          resolution = Resolution.execute_before!(resolution)
+
+          input = resolution.before_output
+
+          case super(unquote_splicing([var(:input, c) | tl(generate_arguments(arity, c))])) do
+            results when is_list(results) ->
+              Enum.map(results, &Resolution.execute_after!(resolution, &1).after_output)
+
+            %{__meta__: %Ecto.Schema.Metadata{}} = result ->
+              Resolution.execute_after!(resolution, result).after_output
+
+            otherwise ->
+              otherwise
+          end
         end
       end
+    end
+  end
 
-      def insert!(changeset, opts) do
-        resolution = Resolution.new!([changeset, opts])
-        resolution = Resolution.execute_before!(resolution)
+  # Automatically execute before and after middleware for the given functions.
+  # These functions return either `{:ok, term()}` or `{:error, term()}`.
+  # For `{:ok, term()}`, ensure the before and after middlewares are executed.
+  defmacro stub_ok_error_functions! do
+    import Macro
+    c = __MODULE__
 
-        result = super(resolution.before_output, opts)
-        Resolution.execute_after!(resolution, result).after_output
-      end
+    arity_2 = [:insert_or_update, :delete, :update, :insert]
+    arity_3 = []
 
-      def update(changeset, opts) do
-        resolution = Resolution.new!([changeset, opts])
-        resolution = Resolution.execute_before!(resolution)
+    for {fun, arity} <- Enum.map(arity_2, &{&1, 2}) ++ Enum.map(arity_3, &{&1, 3}) do
+      quote do
+        def unquote(fun)(unquote_splicing(generate_arguments(arity, c))) do
+          resolution = Resolution.new!([unquote_splicing(generate_arguments(arity, c))])
+          resolution = Resolution.execute_before!(resolution)
 
-        case super(resolution.before_output, opts) do
-          {:ok, result} ->
-            {:ok, Resolution.execute_after!(resolution, result).after_output}
+          input = resolution.before_output
 
-          {:error, reason} ->
-            {:error, reason}
+          case super(unquote_splicing([var(:input, c) | tl(generate_arguments(arity, c))])) do
+            {:ok, result} ->
+              {:ok, Resolution.execute_after!(resolution, result).after_output}
+
+            {:error, reason} ->
+              {:error, reason}
+          end
         end
       end
+    end
+  end
 
-      def update!(changeset, opts) do
-        resolution = Resolution.new!([changeset, opts])
-        resolution = Resolution.execute_before!(resolution)
-        result = super(resolution.before_output, opts)
-        Resolution.execute_after!(resolution, result).after_output
-      end
+  # Automatically execute before and after middleware for the given functions.
+  # These functions either return valid outputs or raise an error.
+  # For valid outputs, ensure the before and after middlewares are executed.
+  defmacro stub_bang_functions! do
+    import Macro
+    c = __MODULE__
 
-      def get(query, id, opts) do
-        resolution = Resolution.new!([query, id, opts])
-        resolution = Resolution.execute_before!(resolution)
+    arity_2 = [:insert_or_update!, :delete!, :one!, :update!, :insert!]
+    arity_3 = [:get!, :get_by!]
 
-        with %{__meta__: %Ecto.Schema.Metadata{}} = result <-
-               super(resolution.before_output, id, opts) do
+    for {fun, arity} <- Enum.map(arity_2, &{&1, 2}) ++ Enum.map(arity_3, &{&1, 3}) do
+      quote do
+        def unquote(fun)(unquote_splicing(generate_arguments(arity, c))) do
+          resolution = Resolution.new!([unquote_splicing(generate_arguments(arity, c))])
+          resolution = Resolution.execute_before!(resolution)
+
+          input = resolution.before_output
+          result = super(unquote_splicing([var(:input, c) | tl(generate_arguments(arity, c))]))
+
           Resolution.execute_after!(resolution, result).after_output
         end
-      end
-
-      def get!(query, id, opts) do
-        resolution = Resolution.new!([query, id, opts])
-        resolution = Resolution.execute_before!(resolution)
-        %{__meta__: %Ecto.Schema.Metadata{}} = result = super(resolution.before_output, id, opts)
-        resolution = %Resolution{resolution | before_input: query, after_input: result}
-        Resolution.execute_after!(resolution, result).after_output
-      end
-
-      def get_by(query, clauses, opts) do
-        resolution = Resolution.new!([query, clauses, opts])
-        resolution = Resolution.execute_before!(resolution)
-
-        with %{__meta__: %Ecto.Schema.Metadata{}} = result <-
-               super(resolution.before_output, clauses, opts) do
-          Resolution.execute_after!(resolution, result).after_output
-        end
-      end
-
-      def get_by!(query, clauses, opts) do
-        resolution = Resolution.new!([query, clauses, opts])
-        resolution = Resolution.execute_before!(resolution)
-
-        %{__meta__: %Ecto.Schema.Metadata{}} =
-          result = super(resolution.before_output, clauses, opts)
-
-        resolution = %Resolution{resolution | before_input: query, after_input: result}
-        Resolution.execute_after!(resolution, result).after_output
-      end
-
-      def one(query, opts) do
-        resolution = Resolution.new!([query, opts])
-        resolution = Resolution.execute_before!(resolution)
-
-        case super(resolution.before_output, opts) do
-          %{__meta__: %Ecto.Schema.Metadata{}} = result ->
-            Resolution.execute_after!(resolution, result).after_output
-
-          error ->
-            error
-        end
-      end
-
-      def one!(query, opts) do
-        resolution = Resolution.new!([query, opts])
-        resolution = Resolution.execute_before!(resolution)
-        result = super(resolution.before_output, opts)
-        Resolution.execute_after!(resolution, result).after_output
-      end
-
-      def all(query, opts) do
-        resolution = Resolution.new!([query, opts])
-        resolution = Resolution.execute_before!(resolution)
-
-        case super(resolution.before_output, opts) do
-          result when is_list(result) ->
-            Enum.map(result, &Resolution.execute_after!(resolution, &1).after_output)
-
-          error ->
-            error
-        end
-      end
-
-      def reload(struct_or_structs, opts) do
-        resolution = Resolution.new!([struct_or_structs, opts])
-        resolution = Resolution.execute_before!(resolution)
-
-        case super(resolution.before_output, opts) do
-          results when is_list(results) ->
-            Enum.map(results, &Resolution.execute_after!(resolution, &1).after_output)
-
-          %{__meta__: %Ecto.Schema.Metadata{}} = result ->
-            Resolution.execute_after!(resolution, result).after_output
-        end
-      end
-
-      def reload!(struct_or_structs, opts) do
-        resolution = Resolution.new!([struct_or_structs, opts])
-        resolution = Resolution.execute_before!(resolution)
-
-        case super(resolution.before_output, opts) do
-          results when is_list(results) ->
-            Enum.map(results, &Resolution.execute_after!(resolution, &1).after_output)
-
-          %{__meta__: %Ecto.Schema.Metadata{}} = result ->
-            Resolution.execute_after!(resolution, result).after_output
-        end
-      end
-
-      def preload(struct_or_structs, preloads, opts) do
-        resolution = Resolution.new!([struct_or_structs, preloads, opts])
-        resolution = Resolution.execute_before!(resolution)
-
-        case super(resolution.before_output, preloads, opts) do
-          results when is_list(results) ->
-            Enum.map(results, &Resolution.execute_after!(resolution, &1).after_output)
-
-          %{__meta__: %Ecto.Schema.Metadata{}} = result ->
-            Resolution.execute_after!(resolution, result).after_output
-
-          otherwise ->
-            otherwise
-        end
-      end
-
-      def delete(changeset_or_query, opts) do
-        resolution = Resolution.new!([changeset_or_query, opts])
-        resolution = Resolution.execute_before!(resolution)
-
-        case super(resolution.before_output, opts) do
-          {:ok, result} ->
-            Resolution.execute_after!(resolution, result).after_output
-
-          error ->
-            error
-        end
-      end
-
-      def delete!(changeset_or_query, opts) do
-        resolution = Resolution.new!([changeset_or_query, opts])
-        resolution = Resolution.execute_before!(resolution)
-        result = super(resolution.before_output, opts)
-        Resolution.execute_after!(resolution, result).after_output
-      end
-
-      def insert_or_update(changeset, opts) do
-        resolution = Resolution.new!([changeset, opts])
-        resolution = Resolution.execute_before!(resolution)
-
-        case super(resolution.before_output, opts) do
-          {:ok, result} ->
-            {:ok, Resolution.execute_after!(resolution, result).after_output}
-
-          {:error, reason} ->
-            {:error, reason}
-        end
-      end
-
-      def insert_or_update!(changeset, opts) do
-        resolution = Resolution.new!([changeset, opts])
-        resolution = Resolution.execute_before!(resolution)
-        result = super(resolution.before_output, opts)
-        Resolution.execute_after!(resolution, result).after_output
       end
     end
   end
