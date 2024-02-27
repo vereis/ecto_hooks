@@ -5,7 +5,7 @@ defmodule EctoHooks.MixProject do
     [
       aliases: aliases(),
       app: :ecto_hooks,
-      version: "1.1.0",
+      version: "1.2.0",
       elixir: "~> 1.13",
       elixirc_options: [warnings_as_errors: true],
       start_permanent: Mix.env() == :prod,
@@ -34,11 +34,15 @@ defmodule EctoHooks.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      # Actual dependencies
+      {:ecto_middleware, "~> 1.0"},
+
       # Lint dependencies
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
 
       # Test dependencies
+      {:ecto, "~> 3.10", only: :test, override: true},
       {:etso, "~> 1.1.0", only: :test},
       {:mix_test_watch, "~> 1.1", only: :test, runtime: false},
       {:excoveralls, "~> 0.16", only: :test, runtime: false},

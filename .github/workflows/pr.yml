@@ -1,46 +1,45 @@
 ---
-name: EctoHooks | PR Workflow
+name: EctoHooks | CI checks
 
 on:
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{github.ref}}
+  cancel-in-progress: true
 
 jobs:
-  test:
+  lint-and-test:
     runs-on: ubuntu-latest
+    name: OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}}
+    strategy:
+      matrix:
+        include:
+          - otp: "26.1"
+            elixir: "1.15.7"
     steps:
-      # ===================================================================================
-      # Setup
-      # ===================================================================================
-      - name: Cancel previous runs
-        uses: styfle/cancel-workflow-action@0.9.0
-        with:
-          access_token: ${{ github.token }}
       - name: Checkout Github repo
-        uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v13
+        uses: actions/checkout@v3.0.2
+      - name: Setup BEAM Env
+        uses: erlef/setup-beam@v1.15
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      # ===================================================================================
-      # Initialize locally installed tools / services
-      # ===================================================================================
-      - run: nix-shell --run "mix local.rebar --force && mix local.hex --force"
-      # ===================================================================================
-      # Get cached dependencies if they exist, otherwise initialize and save cache
-      # ===================================================================================
-      - uses: actions/cache@v2
+          otp-version: ${{matrix.otp}}
+          elixir-version: ${{matrix.elixir}}
+      - name: Setup Cache
+        uses: actions/cache@v3.0.4
         id: mix-cache
         with:
           path: |
             deps
             _build
             priv/plts
-          key: ${{ hashFiles('shell.nix') }}-${{ hashFiles('mix.lock') }}
+          key: ${{ hashFiles('mix.lock') }}-${{ matrix.elixir }}-${{ matrix.otp }}
       - if: steps.mix-cache.outputs.cache-hit != 'true'
-        run: nix-shell --run "mkdir -p priv/plts; mix deps.get; mix deps.compile"
-      # ===================================================================================
-      # Execute linting / test tasks
-      # ===================================================================================
-      - run: nix-shell --run "mix lint"
-      - run: nix-shell --run "mix test --trace --slowest 10"
+        run: mkdir -p priv/plts; mix deps.get; mix deps.compile
+      - run: mix lint
+      - run: MIX_ENV=test mix test
