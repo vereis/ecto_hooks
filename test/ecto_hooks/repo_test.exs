@@ -33,7 +33,7 @@ defmodule EctoHooks.RepoTest do
     end
   end
 
-  def is_bang?(repo_callback) do
+  def bang?(repo_callback) do
     repo_callback
     |> Atom.to_string()
     |> String.ends_with?("!")
@@ -353,7 +353,7 @@ defmodule EctoHooks.RepoTest do
         assert is_nil(Repo.unquote(repo_callback)(User, 1234))
       rescue
         e in Ecto.NoResultsError ->
-          unless is_bang?(unquote(repo_callback)), do: reraise(e, __STACKTRACE__)
+          unless bang?(unquote(repo_callback)), do: reraise(e, __STACKTRACE__)
       end
     end
 
@@ -383,7 +383,7 @@ defmodule EctoHooks.RepoTest do
         assert is_nil(Repo.unquote(repo_callback)(User, id: 1234))
       rescue
         e in Ecto.NoResultsError ->
-          unless is_bang?(unquote(repo_callback)), do: reraise(e, __STACKTRACE__)
+          unless bang?(unquote(repo_callback)), do: reraise(e, __STACKTRACE__)
       end
     end
   end
@@ -637,7 +637,7 @@ defmodule EctoHooks.RepoTest do
         assert %Ecto.Changeset{errors: _errors} = unwrap(response)
       rescue
         e in Ecto.InvalidChangesetError ->
-          unless is_bang?(unquote(repo_callback)), do: reraise(e, __STACKTRACE__)
+          unless bang?(unquote(repo_callback)), do: reraise(e, __STACKTRACE__)
       end
     end
   end
@@ -688,7 +688,7 @@ defmodule EctoHooks.RepoTest do
         assert %Ecto.Changeset{errors: _errors} = unwrap(response)
       rescue
         e in Ecto.InvalidChangesetError ->
-          unless is_bang?(unquote(repo_callback)), do: reraise(e, __STACKTRACE__)
+          unless bang?(unquote(repo_callback)), do: reraise(e, __STACKTRACE__)
       end
     end
   end
