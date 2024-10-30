@@ -19,7 +19,7 @@ defmodule EctoHooks.Repo do
       adapter: Ecto.Adapters.Postgres
   end
 
-  def MyApp.User do
+  defmodule MyApp.User do
     use Ecto.Schema
     require Logger
 
@@ -35,6 +35,24 @@ defmodule EctoHooks.Repo do
       changeset
     end
 
+    def after_get(%__MODULE__{} = user, %EctoHooks.Delta{}) do
+      %__MODULE__{user | full_name: user.first_name <> " " <> user.last_name}
+    end
+  end
+  ```
+
+  As an aside, for documentation and potential code-completion purposes, you may also
+  annotate your `Ecto.Schema` modules with the following:
+
+  ```elixir
+  defmodule MyApp.User do
+    use Ecto.Schema
+    @behaviour EctoHooks
+
+    ...
+
+
+    @impl EctoHooks
     def after_get(%__MODULE__{} = user, %EctoHooks.Delta{}) do
       %__MODULE__{user | full_name: user.first_name <> " " <> user.last_name}
     end
