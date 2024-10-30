@@ -38,6 +38,14 @@ defmodule EctoHooks do
   @callback after_update(schema_struct :: struct(), delta :: Delta.t()) :: struct()
   @callback after_delete(schema_struct :: struct(), delta :: Delta.t()) :: struct()
 
+  @optional_callbacks before_insert: 1,
+                      before_update: 1,
+                      before_delete: 1,
+                      after_get: 2,
+                      after_insert: 2,
+                      after_update: 2,
+                      after_delete: 2
+
   @doc """
   Alternative interface for initializing EctoHooks when `use`-ed in a module as follows:
 
