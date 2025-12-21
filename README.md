@@ -62,11 +62,13 @@ defmodule MyApp.User do
     field :full_name, :string, virtual: true
   end
 
+  @impl EctoHooks
   def before_insert(changeset) do
     Logger.info("Inserting new user")
     changeset
   end
 
+  @impl EctoHooks
   def after_get(%__MODULE__{} = user, %EctoHooks.Delta{}) do
     %{user | full_name: "#{user.first_name} #{user.last_name}"}
   end
@@ -86,6 +88,7 @@ Transform data **before** it reaches the database:
 - `before_delete/1` - Called before `delete/2`, `delete!/2`
 
 ```elixir
+@impl EctoHooks
 def before_insert(changeset) do
   # Normalize email before saving
   case Ecto.Changeset.fetch_change(changeset, :email) do
@@ -107,6 +110,7 @@ Process data **after** database operations:
 All after hooks receive a `%EctoHooks.Delta{}` struct with metadata about the operation:
 
 ```elixir
+@impl EctoHooks
 def after_get(%__MODULE__{} = user, %EctoHooks.Delta{} = delta) do
   # delta.repo_callback - Which repo function was called (:get, :all, etc.)
   # delta.hook - Which hook is executing (:after_get, etc.)
@@ -155,6 +159,7 @@ With hooks, it happens automatically:
 
 ```elixir
 # With hooks - defined once in the schema
+@impl EctoHooks
 def after_get(user, _delta) do
   %{user | full_name: "#{user.first_name} #{user.last_name}"}
 end
@@ -167,11 +172,13 @@ Repo.all(User)       # full_name set for all users
 ### Audit Logging
 
 ```elixir
+@impl EctoHooks
 def after_insert(user, delta) do
   AuditLog.log("user_created", user.id, delta.source)
   user
 end
 
+@impl EctoHooks
 def after_update(user, delta) do
   AuditLog.log("user_updated", user.id, delta.source)
   user
@@ -181,6 +188,7 @@ end
 ### Data Normalization
 
 ```elixir
+@impl EctoHooks
 def before_insert(changeset) do
   changeset
   |> normalize_email()
@@ -209,6 +217,52 @@ EctoHooks.in_hook?()  #=> false
 ```
 
 **Note:** EctoHooks automatically prevents infinite loops by disabling hooks while executing a hook. This means if a hook calls another Repo operation, that operation won't trigger its own hooks.
+
+## Telemetry Events
+
+EctoHooks is built on [EctoMiddleware](https://hex.pm/packages/ecto_middleware), which emits telemetry events for observability. You can attach handlers to monitor hook execution performance and behavior.
+
+### Available Events
+
+**Pipeline Events:**
+- `[:ecto_middleware, :pipeline, :start]` - Hook pipeline execution starts
+- `[:ecto_middleware, :pipeline, :stop]` - Hook pipeline execution completes  
+- `[:ecto_middleware, :pipeline, :exception]` - Hook pipeline execution fails
+
+**Middleware Events:**
+- `[:ecto_middleware, :middleware, :start]` - Individual hook starts (middleware is `EctoHooks`)
+- `[:ecto_middleware, :middleware, :stop]` - Individual hook completes
+- `[:ecto_middleware, :middleware, :exception]` - Individual hook fails
+
+### Example: Monitoring Hook Performance
+
+```elixir
+:telemetry.attach(
+  "log-slow-hooks",
+  [:ecto_middleware, :middleware, :stop],
+  fn _event, %{duration: duration}, %{middleware: EctoHooks}, _config ->
+    if duration > 5_000_000 do  # 5ms
+      Logger.warning("Slow hook execution took #{duration}ns")
+    end
+  end,
+  nil
+)
+```
+
+### Example: Tracking Hook Failures
+
+```elixir
+:telemetry.attach(
+  "track-hook-errors",
+  [:ecto_middleware, :middleware, :exception],
+  fn _event, measurements, %{middleware: EctoHooks, kind: kind, reason: reason}, _config ->
+    Logger.error("Hook failed: #{inspect(kind)} - #{inspect(reason)}")
+  end,
+  nil
+)
+```
+
+For complete telemetry documentation, see the [EctoMiddleware Telemetry Guide](https://hexdocs.pm/ecto_middleware#telemetry).
 
 ## Migration from v1.x
 

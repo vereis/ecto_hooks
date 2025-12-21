@@ -22,6 +22,7 @@ defmodule EctoHooks do
         end
 
         # c:EctoHooks.before_insert/1 - called before c:Ecto.Repo.insert/2
+        @impl EctoHooks
         def before_insert(changeset) do
           # Normalize email before saving
           case Ecto.Changeset.fetch_change(changeset, :email) do
@@ -33,6 +34,7 @@ defmodule EctoHooks do
         end
 
         # c:EctoHooks.after_get/2 - called after c:Ecto.Repo.get/3, c:Ecto.Repo.all/2, etc.
+        @impl EctoHooks
         def after_get(%__MODULE__{} = user, %EctoHooks.Delta{}) do
           # Populate virtual fields after fetching
           %{user | full_name: "\#{user.first_name} \#{user.last_name}"}
@@ -83,6 +85,7 @@ defmodule EctoHooks do
   Before hooks receive the changeset/struct and must return a changeset/struct:
 
       # c:before_insert/1 example
+      @impl EctoHooks
       def before_insert(changeset) do
         changeset
         |> normalize_email()
@@ -102,6 +105,7 @@ defmodule EctoHooks do
   After hooks receive the struct and a `t:EctoHooks.Delta.t/0` with metadata:
 
       # c:after_get/2 example
+      @impl EctoHooks
       def after_get(%__MODULE__{} = user, %EctoHooks.Delta{} = delta) do
         # delta.repo_callback - Which repo function was called (:get, :all, etc.)
         # delta.hook - Which hook is executing (:after_get)
@@ -135,6 +139,7 @@ defmodule EctoHooks do
   EctoHooks automatically prevents infinite loops by disabling hooks while executing a hook.
   If a hook calls another Repo operation, that operation won't trigger its own hooks:
 
+      @impl EctoHooks
       def after_insert(user, _delta) do
         # This update won't trigger c:before_update/1 or c:after_update/2 hooks
         Repo.update!(User.changeset(user, %{last_login: DateTime.utc_now()}))
@@ -163,6 +168,7 @@ defmodule EctoHooks do
 
   Centralize virtual field logic instead of scattering it across your codebase with `c:after_get/2`:
 
+      @impl EctoHooks
       def after_get(user, _delta) do
         %{user | full_name: "\#{user.first_name} \#{user.last_name}"}
       end
@@ -171,6 +177,7 @@ defmodule EctoHooks do
 
   Use `c:after_update/2` to track changes:
 
+      @impl EctoHooks
       def after_update(user, delta) do
         AuditLog.log("user_updated", user.id, delta.source)
         user
@@ -180,6 +187,7 @@ defmodule EctoHooks do
 
   Use `c:before_insert/1` to normalize data before saving:
 
+      @impl EctoHooks
       def before_insert(changeset) do
         changeset
         |> normalize_email()
@@ -191,6 +199,7 @@ defmodule EctoHooks do
 
   Use `c:after_insert/2` to emit events:
 
+      @impl EctoHooks
       def after_insert(user, _delta) do
         :telemetry.execute([:myapp, :user, :created], %{}, %{user_id: user.id})
         user
@@ -202,6 +211,50 @@ defmodule EctoHooks do
   - Hooks run for **every operation** - keep them lightweight
   - Consider using background jobs for heavy processing
   - Be careful with Repo calls inside hooks (see "Preventing Infinite Loops")
+
+  ## Telemetry Events
+
+  EctoHooks is built on [EctoMiddleware](https://hex.pm/packages/ecto_middleware),
+  which emits telemetry events for observability. Attach handlers to monitor hook
+  execution performance and behavior.
+
+  ### Available Events
+
+  **Pipeline Events:**
+  - `[:ecto_middleware, :pipeline, :start]` - Hook pipeline execution starts
+  - `[:ecto_middleware, :pipeline, :stop]` - Hook pipeline execution completes
+  - `[:ecto_middleware, :pipeline, :exception]` - Hook pipeline execution fails
+
+  **Middleware Events:**
+  - `[:ecto_middleware, :middleware, :start]` - Individual hook starts (middleware is `EctoHooks`)
+  - `[:ecto_middleware, :middleware, :stop]` - Individual hook completes
+  - `[:ecto_middleware, :middleware, :exception]` - Individual hook fails
+
+  ### Example: Monitoring Hook Performance
+
+      :telemetry.attach(
+        "log-slow-hooks",
+        [:ecto_middleware, :middleware, :stop],
+        fn _event, %{duration: duration}, %{middleware: EctoHooks}, _config ->
+          if duration > 5_000_000 do  # 5ms
+            Logger.warning("Slow hook execution took \#{duration}ns")
+          end
+        end,
+        nil
+      )
+
+  ### Example: Tracking Hook Failures
+
+      :telemetry.attach(
+        "track-hook-errors",
+        [:ecto_middleware, :middleware, :exception],
+        fn _event, _measurements, %{middleware: EctoHooks, kind: kind, reason: reason}, _config ->
+          Logger.error("Hook failed: \#{inspect(kind)} - \#{inspect(reason)}")
+        end,
+        nil
+      )
+
+  For complete telemetry documentation, see the [EctoMiddleware Telemetry Guide](https://hexdocs.pm/ecto_middleware#telemetry).
 
   ## Migration from v1.x
 
@@ -245,7 +298,9 @@ defmodule EctoHooks do
   hooks in schemas will continue to work without modification:
 
       # These work exactly the same in v2.0
+      @impl EctoHooks
       def before_insert(changeset), do: changeset
+      @impl EctoHooks
       def after_get(user, delta), do: user
 
   ### Benefits of v2.0
@@ -488,6 +543,7 @@ defmodule EctoHooks do
       #=> false
 
       # Inside a hook that calls Repo
+      @impl EctoHooks
       def after_insert(user, _delta) do
         EctoHooks.in_hook?()
         #=> true
