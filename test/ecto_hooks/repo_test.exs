@@ -45,9 +45,16 @@ defmodule EctoHooks.RepoTest do
   def unwrap(x), do: x
 
   defmodule Repo do
-    use EctoHooks.Repo,
+    use Ecto.Repo,
       otp_app: :ecto_hooks,
       adapter: Etso.Adapter
+
+    use EctoMiddleware.Repo
+
+    @impl EctoMiddleware.Repo
+    def middleware(_action, _resource) do
+      [EctoHooks]
+    end
   end
 
   defmodule UserTeam do

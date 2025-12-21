@@ -5,7 +5,7 @@ defmodule EctoHooks.MixProject do
     [
       aliases: aliases(),
       app: :ecto_hooks,
-      version: "1.2.1",
+      version: "2.0.0",
       elixir: "~> 1.13",
       elixirc_options: [warnings_as_errors: true],
       start_permanent: Mix.env() == :prod,
@@ -15,12 +15,15 @@ defmodule EctoHooks.MixProject do
         test: :test,
         "test.watch": :test,
         coveralls: :test,
-        "coveralls.html": :test
+        "coveralls.html": :test,
+        "coveralls.github": :test,
+        precommit: :test
       ],
       test_coverage: [tool: ExCoveralls],
       package: package(),
       description: description(),
-      source_url: "https://github.com/vereis/ecto_hooks"
+      source_url: "https://github.com/vereis/ecto_hooks",
+      docs: docs()
     ]
   end
 
@@ -35,7 +38,7 @@ defmodule EctoHooks.MixProject do
   defp deps do
     [
       # Actual dependencies
-      {:ecto_middleware, "~> 1.0"},
+      {:ecto_middleware, "~> 2.0"},
 
       # Lint dependencies
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
@@ -48,12 +51,28 @@ defmodule EctoHooks.MixProject do
       {:excoveralls, "~> 0.16", only: :test, runtime: false},
 
       # Misc dependencies
-      {:ex_doc, "~> 0.14", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.39", only: :dev, runtime: false}
     ]
   end
 
   defp aliases do
-    [lint: ["format --check-formatted --dry-run", "credo --strict", "dialyzer"]]
+    [
+      lint: [
+        "deps.unlock --unused",
+        "format --check-formatted",
+        "compile --warnings-as-errors",
+        "credo --strict",
+        "dialyzer"
+      ],
+      precommit: [
+        "deps.unlock --unused",
+        "format",
+        "compile --warnings-as-errors",
+        "credo --strict",
+        "dialyzer",
+        "test"
+      ]
+    ]
   end
 
   defp description() do
@@ -71,6 +90,15 @@ defmodule EctoHooks.MixProject do
       links: %{
         "GitHub" => "https://github.com/vereis/ecto_hooks"
       }
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      extras: [
+        "README.md"
+      ]
     ]
   end
 end
