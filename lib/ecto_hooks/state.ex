@@ -12,7 +12,8 @@ defmodule EctoHooks.State do
   @doc """
   Returns a boolean indicating if EctoHooks are enabled in the current process.
 
-  If `true`, hooks will not be triggered for Repo operations.
+  When `true`, hooks will be triggered for Repo operations.
+  When `false`, hooks are disabled and will not run.
   """
   def hooks_enabled? do
     if get_state({true, :hooks_enabled}, true) do
