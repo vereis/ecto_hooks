@@ -42,7 +42,7 @@ defmodule EctoHooks.MixProject do
 
       # Lint dependencies
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
+      {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
 
       # Test dependencies
       {:ecto, "~> 3.10", only: :test, override: true},
