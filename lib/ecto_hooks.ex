@@ -571,8 +571,13 @@ defmodule EctoHooks do
       param_1
     end
   rescue
-    _e in UndefinedFunctionError ->
-      param_1
+    e in [UndefinedFunctionError, FunctionClauseError] ->
+      # Only catch if the error is for one of our hook callbacks
+      if e.function in @hooks do
+        param_1
+      else
+        reraise e, __STACKTRACE__
+      end
   after
     :ok = State.enable_hooks(global: false)
     :ok = State.release_hook()
